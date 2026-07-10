@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Photon Ring — a black hole, honestly traced</title>
+<style>
+/* Deliberately single-theme: a planetarium console is a dark room. */
+:root{
+  --void:#060a13; --glass:rgba(12,19,34,.94); --glass-soft:rgba(12,19,34,.78);
+  --ink:#e9eef7; --ink-dim:#93a0b8; --ink-faint:#5d6a83;
+  --line:rgba(147,160,184,.18);
+  --teal:#5bc8ae; --amber:#e5a55c; --gold:#ffd98f; --hot:#ff8b55;
+  --ok:#69d08c; --warn:#e8b84b; --bad:#e4685e;
+  --serif:"Palatino","Palatino Linotype","Book Antiqua",Georgia,serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+}
+html,body{height:100%}
+body{margin:0;background:var(--void);color:var(--ink);font-family:var(--sans);overflow:hidden}
+#gl,#cpu{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#cpu{display:none;background:#000}
+#gl.dragging,#cpu.dragging{cursor:grabbing}
+
+.panel{position:fixed;background:var(--glass);border:1px solid var(--line);border-radius:10px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,.45)}
+
+#leftcol{position:fixed;top:14px;left:14px;bottom:14px;width:288px;display:flex;flex-direction:column;gap:10px;pointer-events:none;z-index:2}
+#leftcol .panel{position:static;pointer-events:auto}
+#masthead{padding:14px 18px 12px;pointer-events:none!important}
+#masthead h1{font-family:var(--serif);font-weight:400;font-size:23px;letter-spacing:.01em;margin:0 0 4px;text-wrap:balance}
+#masthead h1 em{font-style:normal;color:var(--gold)}
+#masthead p{margin:0;font-size:12px;line-height:1.5;color:var(--ink-dim)}
+#masthead .plea{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;margin-top:6px}
+
+#timebar{top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 14px;z-index:3}
+#playBtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:rgba(233,238,247,.06);
+  color:var(--ink);font-size:14px;cursor:pointer;display:grid;place-items:center}
+#playBtn:hover{background:rgba(233,238,247,.12)}
+#timebar input[type=range]{width:130px}
+#speedLabel{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);white-space:nowrap}
+#clock{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-dim);min-width:150px}
+#speedVal{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;color:var(--ink-faint);min-width:78px}
+
+#controls{padding:14px 16px;overflow-y:auto;min-height:0;flex:0 1 auto}
+#readouts{right:14px;top:14px;width:302px;padding:14px 16px;max-height:calc(100vh - 28px);overflow-y:auto}
+
+.sect{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 10px}
+.sect:not(:first-child){margin-top:16px}
+.ctl{margin-bottom:12px}
+.ctl label{display:flex;justify-content:space-between;font-size:12px;color:var(--ink-dim);margin-bottom:4px}
+.ctl label b{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink)}
+input[type=range]{width:100%;accent-color:var(--gold);height:18px;margin:0}
+.hint{font-size:11px;line-height:1.5;color:var(--ink-faint);margin:6px 0 0}
+.presets{display:flex;gap:6px;flex-wrap:wrap}
+.presets button, .seg button, #reseed{font-size:11px;padding:5px 9px;border-radius:7px;border:1px solid var(--line);
+  background:rgba(233,238,247,.05);color:var(--ink-dim);cursor:pointer;font-family:var(--sans)}
+.presets button:hover,.seg button:hover,#reseed:hover{color:var(--ink);background:rgba(233,238,247,.12)}
+.presets button.on{background:rgba(255,217,143,.16);color:var(--gold);border-color:rgba(255,217,143,.4)}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+.seg button{border:0;border-radius:0;flex:1}
+.seg button.on{background:rgba(255,217,143,.16);color:var(--gold)}
+.seg button:disabled{opacity:.35;cursor:not-allowed}
+#reseed{width:100%;margin-top:10px}
+button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px dotted rgba(147,160,184,.12)}
+.row:last-child{border-bottom:0}
+.row .k{font-size:11.5px;color:var(--ink-dim)}
+.row .v{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;text-align:right;white-space:nowrap}
+.pill{display:inline-block;font-size:10px;letter-spacing:.06em;padding:2px 8px;border-radius:99px;font-family:var(--sans);font-weight:600}
+.pill.ok{background:rgba(105,208,140,.16);color:var(--ok)}
+.pill.warn{background:rgba(232,184,75,.16);color:var(--warn)}
+.pill.bad{background:rgba(228,104,94,.18);color:var(--bad)}
+.pill.dim{background:rgba(147,160,184,.14);color:var(--ink-dim)}
+
+#science{bottom:14px;left:50%;transform:translateX(-50%);max-width:470px;width:calc(100vw - 660px);min-width:300px;font-size:12.5px;z-index:3}
+#science summary{cursor:pointer;list-style:none;padding:10px 16px;font-family:var(--serif);font-size:14px;color:var(--gold)}
+#science summary::-webkit-details-marker{display:none}
+#science summary::before{content:"✶ "}
+#science .body{padding:2px 18px 14px;max-height:44vh;overflow-y:auto;line-height:1.6;color:var(--ink-dim);max-width:62ch}
+#science h3{font-family:var(--serif);font-weight:400;color:var(--ink);font-size:14px;margin:14px 0 6px}
+#science p{margin:0 0 9px}
+#science b{color:var(--ink);font-weight:600}
+#science .fn{font-size:11px;color:var(--ink-faint);border-top:1px solid var(--line);padding-top:8px;margin-top:10px}
+#science .fn+.fn{border-top:0;padding-top:0;margin-top:0}
+#science .fn b{color:var(--ink-dim)}
+
+#banner{top:66px;left:50%;transform:translateX(-50%);padding:9px 18px;font-size:13px;color:var(--bad);
+  border-color:rgba(228,104,94,.5);display:none;text-align:center;z-index:4}
+
+@media (max-width:900px){
+  #leftcol{width:220px;bottom:auto;max-height:52vh}
+  #masthead h1{font-size:16px} #masthead .plea{display:none} #masthead p{font-size:11px}
+  #controls{max-height:24vh}
+  #readouts{width:236px;max-height:44vh}
+  #science{max-width:calc(100vw - 28px);width:calc(100vw - 28px);bottom:64px}
+  #timebar{top:auto;bottom:8px} #clock{min-width:0}
+}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<canvas id="cpu"></canvas>
+
+<div id="leftcol">
+<div id="masthead" class="panel">
+  <h1>The Photon Ring<br><em>a black hole, honestly traced</em></h1>
+  <p>Every pixel is a <b>null geodesic</b>, integrated live through Schwarzschild spacetime — the photon ring, the disk’s far side arching over the top, the wing brightened by Doppler beaming. Nothing is painted on.</p>
+  <p class="plea">“People of science, hear my plea: they showed me a photograph of a glowing ring and called it a black hole. Is it true the far side of the disk arches over the shadow, and one wing burns brighter because the gas rushes toward us? Bend every ray honestly, and show me what the camera saw.”</p>
+  <p style="margin-top:6px;color:var(--ink-faint);font-size:11px">drag to orbit · scroll or pinch to zoom</p>
+</div>
+
+<aside id="controls" class="panel">
+  <p class="sect">Point of view</p>
+  <div class="ctl"><label>Inclination from the pole <b id="incVal"></b></label>
+    <input id="inc" type="range" min="5" max="900" value="820"></div>
+  <div class="ctl"><label>Camera distance <b id="distVal"></b></label>
+    <input id="dist" type="range" min="0" max="1000" value="581"></div>
+  <div class="ctl"><label>Field of view <b id="fovVal"></b></label>
+    <input id="fov" type="range" min="25" max="100" value="55"></div>
+
+  <p class="sect">The accretion disk</p>
+  <div class="ctl"><label>Outer radius <b id="routVal"></b></label>
+    <input id="rout" type="range" min="40" max="300" value="140">
+    <p class="hint">The inner edge is not a slider: gas can’t orbit stably inside the ISCO at 3 r<sub>s</sub>.</p></div>
+  <div class="ctl"><label>Disk temperature, peak <b id="tmaxVal"></b></label>
+    <input id="tmax" type="range" min="2000" max="25000" value="7000"></div>
+
+  <p class="sect">Relativity, à la carte</p>
+  <div class="presets" id="fxBtns">
+    <button data-f="disk" class="on">Disk</button>
+    <button data-f="lens" class="on">Bend light</button>
+    <button data-f="dopp" class="on">Doppler &amp; beaming</button>
+    <button data-f="grav" class="on">Time dilation</button>
+  </div>
+  <p class="hint">Switch each effect off to see what it was doing. “Bend light” off = Newton’s straight rays.</p>
+
+  <p class="sect">Scenes</p>
+  <div class="presets" id="presetBtns">
+    <button data-p="furnace">Edge-on furnace</button>
+    <button data-p="m87">M87* portrait</button>
+    <button data-p="interstellar">The Interstellar look</button>
+    <button data-p="naked">Naked lens</button>
+    <button data-p="newton">Newton’s sky</button>
+  </div>
+  <p class="hint" id="presetHint"></p>
+
+  <p class="sect">Integrator</p>
+  <div class="ctl"><label>Geodesic steps per ray <b id="stepsVal"></b></label>
+    <input id="steps" type="range" min="200" max="2400" value="900">
+    <p class="hint">More steps let near-critical rays wind further around the photon sphere before we give up.</p></div>
+  <div class="ctl"><label>Resolution scale <b id="resVal"></b></label>
+    <input id="res" type="range" min="35" max="100" value="60"></div>
+
+  <p class="sect">Compute engine</p>
+  <div class="seg" id="engSeg">
+    <button data-m="cpu">CPU · float64</button>
+    <button data-m="gpu">GPU · float32</button>
+  </div>
+  <p class="hint">The same rays, two arithmetics. The CPU engine is the double-precision reference — patient, one honest frame at a time.</p>
+  <button id="reseed">Re-seed the background sky 🎲</button>
+</aside>
+</div>
+
+<div id="timebar" class="panel">
+  <button id="playBtn" aria-label="Play or pause">❚❚</button>
+  <label id="speedLabel" for="speed">Speed</label>
+  <input id="speed" type="range" min="0" max="1000" value="490">
+  <span id="speedVal"></span>
+  <span id="clock"></span>
+</div>
+
+<div id="banner" class="panel"></div>
+
+<aside id="readouts" class="panel">
+  <p class="sect">Honesty checks&thinsp;*</p>
+  <div class="row"><span class="k">Photon ring b, measured</span><span class="v" id="rRing">measuring…</span></div>
+  <div class="row"><span class="k">…vs theory 3√3⁄2 r<sub>s</sub></span><span class="v"><span id="vRing" class="pill dim">—</span></span></div>
+  <div class="row"><span class="k">Weak bend @ b = 50 r<sub>s</sub></span><span class="v" id="rWeak">—</span></div>
+  <div class="row"><span class="k">…vs general relativity</span><span class="v"><span id="vWeak" class="pill dim">—</span></span></div>
+  <div class="row"><span class="k">Render-grade ray, Δα</span><span class="v" id="rGrade">—</span></div>
+  <div class="row"><span class="k">…vs reference ray</span><span class="v"><span id="vGrade" class="pill dim">—</span></span></div>
+  <div class="row"><span class="k">float32’s toll on Δα</span><span class="v" id="rF32">—</span></div>
+  <p class="hint">* fired in float64 on the CPU: a reference ray with 25,000 RK4 steps run out to r = 2,000 r<sub>s</sub>, against theory and against a ray at your current quality slider. Re-measured when you move the slider.</p>
+
+  <p class="sect">The ruler is the mass</p>
+  <div class="seg" id="massSeg">
+    <button data-m="0">10 M☉</button>
+    <button data-m="1" class="on">Sgr A*</button>
+    <button data-m="2">M87*</button>
+  </div>
+  <div class="row"><span class="k">Schwarzschild radius r<sub>s</sub></span><span class="v" id="rRs">—</span></div>
+  <div class="row"><span class="k">One ISCO orbit takes</span><span class="v" id="rIsco">—</span></div>
+  <div class="row"><span class="k">Ring on Earth’s sky</span><span class="v" id="rAng">—</span></div>
+  <p class="hint" id="massHint">The geometry on screen is scale-free (everything is in r<sub>s</sub>); the mass you pick only sets the ruler and the clock.</p>
+
+  <p class="sect">Console</p>
+  <div class="row"><span class="k">Frames per second</span><span class="v" id="rFps">—</span></div>
+  <div class="row"><span class="k">Compute engine</span><span class="v"><span id="rEng" class="pill dim">—</span></span></div>
+  <div class="row"><span class="k">Frame</span><span class="v" id="rFrame">—</span></div>
+  <div class="row"><span class="k">Geodesics per second</span><span class="v" id="rMray">—</span></div>
+  <div class="row" id="progRow" style="display:none"><span class="k">CPU frame progress</span><span class="v" id="rProg">—</span></div>
+</aside>
+
+<details id="science" class="panel">
+  <summary>The science: bent light, a lopsided ring, and honest caveats</summary>
+  <div class="body">
+    <h3>1 · Every pixel is a geodesic</h3>
+    <p>The camera fires one ray of light per pixel, backwards into the scene. Around a non-rotating black hole, spacetime is Schwarzschild’s 1916 solution, and light obeys the exact null-geodesic orbit equation <b>d²u/dφ² = −u + (3/2)&thinsp;r<sub>s</sub>u²</b> (u = 1/r). Each ray’s conserved impact parameter is set exactly from the camera’s position — b = r&thinsp;sinψ/√(1−r<sub>s</sub>/r) — and then the equation is integrated step by step with fourth-order Runge–Kutta. A ray ends one of three ways: it crosses the glowing disk (a pixel of hot gas), it climbs back out to the stars (a pixel of lensed sky), or it spirals inside the photon sphere and never returns (a pixel of shadow). Nothing else decides the image.</p>
+    <h3>2 · Why the picture looks like that</h3>
+    <p>The bright halo hugging the shadow is the <b>photon ring</b>: rays with impact parameter near b = 3√3⁄2&thinsp;r<sub>s</sub> ≈ 2.598&thinsp;r<sub>s</sub> circle the hole one or more times before escaping, so a thin annulus of sky carries an image of the entire disk, repeated. The disk’s far side doesn’t hide behind the hole: rays passing over the pole are bent down onto its top surface, so you see it <b>arched above the shadow</b> (and its underside mirrored below — the Interstellar look). And the two wings are unequal because the gas orbits at nearly half the speed of light at the inner edge: relativistic <b>Doppler beaming</b> brightens the approaching side by roughly g⁴, where g is the frequency shift. Toggle the effects off one at a time and the portrait falls apart into a Newtonian saucer.</p>
+    <h3>3 · The disk</h3>
+    <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest.</p>
+    <h3>4 · Honest caveats</h3>
+    <p><b>No spin.</b> This is Schwarzschild; real black holes rotate. Kerr spacetime drags frames, shrinks the ISCO (as low as 0.5&thinsp;r<sub>s</sub> of gravitational radius for maximal spin), and makes the shadow slightly D-shaped — percent-level corrections to the ring, big corrections to the inner disk. <b>The disk is opaque and thin</b>; M87*’s real glow is synchrotron plasma, not a blackbody, and no polarization is computed here. <b>The camera hovers</b> — a static Schwarzschild observer, engines burning, not a free-falling one. The background sky is procedural, not a star catalog. And a confession from Hollywood: Interstellar’s Gargantua deliberately <i>omitted</i> Doppler beaming and blue/red shifts so the disk would look symmetric and golden on screen — the preset above reproduces that choice; flip “Doppler &amp; beaming” back on to see what Kip Thorne’s honest version looks like.</p>
+    <p class="fn"><b>Numerical method:</b> per pixel, the ray’s plane is found from camera position and pixel direction (Schwarzschild orbits are planar), the Binet equation above is advanced by RK4 with dφ = 6π/steps, and disk crossings are detected by sign change of the plane-height and interpolated within the step. Escape is declared when the ray moves outward past r = max(2r<sub>cam</sub>, 400&thinsp;r<sub>s</sub>); its tangent there is the sky direction (the residual bending beyond that radius is ~2Mb/r² ≲ 10⁻⁵ rad). Rays that exhaust the step budget while winding are charged to the shadow — that is what the quality slider trades.</p>
+    <p class="fn"><b>Two engines:</b> the GPU renders every pixel in parallel in float32 fragment shaders; the CPU engine renders the identical algorithm in float64, progressively, as the reference. The honesty panel quantifies both sins: integration error (render-grade vs 25,000-step reference ray) and arithmetic error (the same ray replayed with float32 rounding after every step).</p>
+    <p class="fn"><b>Units:</b> G = c = 1, lengths in Schwarzschild radii (M = ½), time in r<sub>s</sub>/c. Blackbody colors via a standard Planckian-locus fit, ACES-style tone mapping. The mass buttons change no physics — only the physical ruler: r<sub>s</sub> in kilometres, the ISCO clock, and the ring’s angular size from Earth (52 μas for Sgr A*, ~40 μas for M87* — the sizes the Event Horizon Telescope photographed).</p>
+  </div>
+</details>
+
+<script>
+'use strict';
+/* ===================== constants (G = c = 1, lengths in rs, M = 1/2) ===================== */
+const TAU=Math.PI*2, RAD=Math.PI/180;
+const RIN=3.0;                          // ISCO, rs
+const BCRIT_TH=3*Math.sqrt(3)/2;        // photon-ring impact parameter, rs
+const ISCO_T=2*Math.PI*Math.sqrt(54);   // ISCO coordinate period, rs/c
+let PMAX=0; for(let r=3.0001;r<9;r+=0.0004){const p=Math.pow(r,-0.75)*Math.pow(1-Math.sqrt(RIN/r),0.25); if(p>PMAX)PMAX=p;}
+
+const MASSES=[
+  {label:'10 M☉',  M:10,      D_kpc:1,    note:'a stellar-mass black hole parked 1 kpc away'},
+  {label:'Sgr A*', M:4.154e6, D_kpc:8.18, note:'the black hole at the center of the Milky Way'},
+  {label:'M87*',   M:6.5e9,   D_kpc:16800,note:'the giant the Event Horizon Telescope photographed first'}];
+const KM_PER_MSUN=2.953;      // rs in km per solar mass
+const S_PER_MSUN=9.851e-6;    // rs/c in seconds per solar mass
+const KPC_KM=3.0857e16;
+
+/* ===================== parameters ===================== */
+const mobile=innerWidth<700;
+const params={ inc:82, dist:27, fov:55, rout:14, tmax:7000,
+  disk:1, lens:1, dopp:1, grav:1,
+  steps:mobile?500:900, res:mobile?0.5:0.6, mode:'gpu', mass:1, speed:15 };
+const PRESETS={
+  furnace:{inc:82,dist:27,fov:55,rout:14,tmax:5800,disk:1,lens:1,dopp:1,grav:1,mass:1,
+    hint:'Nearly edge-on, everything switched on. The classic lopsided portrait: far side arched over the shadow, approaching wing beamed bright.'},
+  m87:{inc:17,dist:31,fov:45,rout:9,tmax:9500,disk:1,lens:1,dopp:1,grav:1,mass:2,
+    hint:'Face-on-ish, the EHT geometry (M87’s jet points ~17° from our line of sight). Even nearly face-on, beaming keeps one side brighter — as in the real photograph.'},
+  interstellar:{inc:85,dist:24,fov:50,rout:18,tmax:5200,disk:1,lens:1,dopp:0,grav:0,mass:2,
+    hint:'Gargantua’s confession: the movie kept the lensing but deliberately switched off Doppler beaming and the shifts, so the disk stays symmetric and golden. Flip them back on for Kip Thorne’s honest version.'},
+  naked:{inc:60,dist:45,fov:42,rout:14,tmax:7000,disk:0,lens:1,dopp:1,grav:1,mass:1,
+    hint:'No disk — just the star field, gravitationally lensed. Watch stars smear into arcs and double images near the shadow’s edge; the whole sky behind the hole is squeezed into the Einstein ring.'},
+  newton:{inc:80,dist:27,fov:55,rout:14,tmax:7000,disk:1,lens:0,dopp:1,grav:1,mass:1,
+    hint:'Light travels in straight lines, as Newton would have it: a flat saucer with a dark ball in the middle, the far side hidden. Everything the real image has and this one lacks is general relativity.'}};
+
+let seed=20260709;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let rng=mulberry32(seed);
+let skySeed=(rng()*4294967296)>>>0;
+
+let simT=0, playing=!matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ===================== small math ===================== */
+function norm3(a){const l=Math.hypot(a[0],a[1],a[2])||1;return[a[0]/l,a[1]/l,a[2]/l];}
+function cross3(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];}
+
+/* ===================== geodesic core (shared by CPU engine & honesty tests) =====================
+   Binet equation u'' = -u + 1.5 u² (rs=1), RK4 in φ. Returns:
+   0 = sky (out.dx/dy/dz set), 1 = disk (out.r, out.Xx/Xy, out.g set), 2 = captured/wound out. */
+function traceRay(ox,oy,oz,dx,dy,dz,o,out){
+  const r0=Math.sqrt(ox*ox+oy*oy+oz*oz);
+  let e1x=ox/r0,e1y=oy/r0,e1z=oz/r0;
+  const cp=dx*e1x+dy*e1y+dz*e1z;
+  let ex=dx-cp*e1x,ey=dy-cp*e1y,ez=dz-cp*e1z;
+  const sp=Math.sqrt(ex*ex+ey*ey+ez*ez);
+  if(sp<1e-9){ if(cp<0)return 2; out.dx=dx;out.dy=dy;out.dz=dz; return 0; }
+  const e2x=ex/sp,e2y=ey/sp,e2z=ez/sp;
+  const e3z=e1x*e2y-e1y*e2x;                 // z of e1×e2 (photon angular-momentum axis)
+  const b=r0*sp/Math.sqrt(1-1/r0);
+  const fr=o.fr;
+  let u=1/r0;
+  let w=Math.sqrt(Math.max(1/(b*b)-u*u*(1-u),0))*(cp<0?1:-1);
+  if(fr){u=Math.fround(u);w=Math.fround(w);}
+  const h=o.dphi, uEsc=1/o.rEsc, invb2=1/(b*b);
+  let phi=0, Ap=e1z, up=u, drift=0;
+  for(let i=0;i<o.steps;i++){
+    let k1u=w,k1w=1.5*u*u-u;
+    let au=u+0.5*h*k1u, aw=w+0.5*h*k1w;
+    let k2u=aw,k2w=1.5*au*au-au;
+    au=u+0.5*h*k2u; aw=w+0.5*h*k2w;
+    let k3u=aw,k3w=1.5*au*au-au;
+    au=u+h*k3u; aw=w+h*k3w;
+    let k4u=aw,k4w=1.5*au*au-au;
+    u+=h*(k1u+2*(k2u+k3u)+k4u)/6;
+    w+=h*(k1w+2*(k2w+k3w)+k4w)/6;
+    if(fr){u=Math.fround(u);w=Math.fround(w);}
+    phi+=h;
+    if(u>=1)return 2;                        // through the horizon
+    const cs=Math.cos(phi), sn=Math.sin(phi);
+    const A=cs*e1z+sn*e2z;
+    if(o.disk&&A*Ap<0){
+      const f=Ap/(Ap-A);
+      const ux=up+f*(u-up), rx=1/ux;
+      if(rx>=RIN&&rx<=o.rout){
+        const phix=phi-h*(1-f), c2=Math.cos(phix), s2=Math.sin(phix);
+        out.r=rx;
+        out.Xx=(c2*e1x+s2*e2x)*rx; out.Xy=(c2*e1y+s2*e2y)*rx;
+        const om=1/Math.sqrt(2*rx*rx*rx);
+        const gden=o.dopp?(1-om*b*e3z):1;
+        const gnum=o.grav?Math.sqrt(Math.max(1-1.5/rx,0))/Math.sqrt(1-1/r0):1;
+        out.g=gnum/Math.max(gden,1e-3);
+        return 1;
+      }
+    }
+    Ap=A; up=u;
+    if(o.track){const q=Math.abs((w*w+u*u*(1-u))*b*b-1); if(q>drift)drift=q;}
+    if(w<0&&u<uEsc){
+      const tx=-sn*u-cs*w, ty=cs*u-sn*w;
+      let vx=tx*e1x+ty*e2x, vy=tx*e1y+ty*e2y, vz=tx*e1z+ty*e2z;
+      const l=Math.hypot(vx,vy,vz);
+      out.dx=vx/l; out.dy=vy/l; out.dz=vz/l; out.drift=drift;
+      return 0;
+    }
+  }
+  return 2;                                  // wound past the step budget: charged to the shadow
+}
+/* Newton mode: straight rays, dark sphere of radius rs, flat disk */
+function traceNewton(ox,oy,oz,dx,dy,dz,o,out){
+  const tb=-(ox*dx+oy*dy+oz*dz), d2=(ox*ox+oy*oy+oz*oz)-tb*tb;
+  const tBH=(d2<1&&tb>0)?tb-Math.sqrt(1-d2):1e30;
+  const tD=Math.abs(dz)>1e-9?(-oz/dz):1e30;
+  if(o.disk&&tD>0&&tD<tBH){
+    const Xx=ox+tD*dx, Xy=oy+tD*dy, rx=Math.hypot(Xx,Xy);
+    if(rx>=RIN&&rx<=o.rout){
+      const r0=Math.sqrt(ox*ox+oy*oy+oz*oz);
+      const lz=ox*dy-oy*dx;
+      const om=1/Math.sqrt(2*rx*rx*rx);
+      const gden=o.dopp?(1-om*lz):1;
+      const gnum=o.grav?Math.sqrt(Math.max(1-1.5/rx,0))/Math.sqrt(1-1/r0):1;
+      out.r=rx; out.Xx=Xx; out.Xy=Xy; out.g=gnum/Math.max(gden,1e-3);
+      return 1;
+    }
+  }
+  if(tBH<1e29)return 2;
+  out.dx=dx;out.dy=dy;out.dz=dz;
+  return 0;
+}
+
+/* ===================== shading (JS mirror of the GLSL below) ===================== */
+function uhash(x){x=(x^(x>>>16))>>>0;x=Math.imul(x,0x7feb352d)>>>0;x=(x^(x>>>15))>>>0;x=Math.imul(x,0x846ca68b)>>>0;x=(x^(x>>>16))>>>0;return x;}
+function hcell(cx,cy,cz,k){return uhash(((Math.imul(cx,73856093)^Math.imul(cy,19349663)^Math.imul(cz,83492791))^k^skySeed)>>>0)*2.3283064365386963e-10;}
+function hi2(x,y,k){return uhash(((Math.imul(x,73856093)^Math.imul(y,19349663))^k^skySeed)>>>0)*2.3283064365386963e-10;}
+function vnoise(px,py,k){
+  const ix=Math.floor(px), iy=Math.floor(py);
+  let fx=px-ix, fy=py-iy;
+  fx=fx*fx*(3-2*fx); fy=fy*fy*(3-2*fy);
+  const a=hi2(ix,iy,k),b=hi2(ix+1,iy,k),c=hi2(ix,iy+1,k),d=hi2(ix+1,iy+1,k);
+  return a+(b-a)*fx+(c-a)*fy+(a-b-c+d)*fx*fy;
+}
+function fbm(px,py,k){return 0.55*vnoise(px,py,k)+0.28*vnoise(px*2.63,py*2.63,k+7)+0.17*vnoise(px*6.17,py*6.17,k+13);}
+function blackbody(T,out){
+  T=Math.min(40000,Math.max(1000,T));
+  const t=T*0.01; let r,g,b;
+  if(T<6600){r=255;g=99.4708025861*Math.log(t)-161.1195681661;b=T<1900?0:138.5177312231*Math.log(t-10)-305.0447927307;}
+  else{r=329.698727446*Math.pow(t-60,-0.1332047592);g=288.1221695283*Math.pow(t-60,-0.0755148492);b=255;}
+  r=Math.min(1,Math.max(0,r/255));g=Math.min(1,Math.max(0,g/255));b=Math.min(1,Math.max(0,b/255));
+  out[0]=r*r;out[1]=g*g;out[2]=b*b;   // ≈ gamma-2 → linear
+}
+const GN=norm3([0.42,0.10,0.90]);
+const GX=norm3(cross3(GN,[0,1,0])), GY=cross3(GN,GX);
+const _bb=[0,0,0];
+function skyCol(dx,dy,dz,pxAng,out){
+  out[0]=0;out[1]=0;out[2]=0;
+  for(let s=0;s<3;s++){
+    const S=s===0?23:(s===1?47:89), amp=s===0?0.7:(s===1?0.5:0.32), k=s===0?101:(s===1?211:307);
+    const sz0=pxAng*(s===0?1.3:(s===1?1.1:1.0));
+    const cx=Math.floor(dx*S),cy=Math.floor(dy*S),cz=Math.floor(dz*S);
+    const h0=hcell(cx,cy,cz,k);
+    if(h0>0.17)continue;
+    let sx=cx+hcell(cx,cy,cz,k+1), sy=cy+hcell(cx,cy,cz,k+2), sz=cz+hcell(cx,cy,cz,k+3);
+    const l=Math.hypot(sx,sy,sz); sx/=l;sy/=l;sz/=l;
+    const ch=Math.hypot(dx-sx,dy-sy,dz-sz);
+    const sig=sz0*(1.1+2.5*Math.pow(hcell(cx,cy,cz,k+4),8));
+    const br=amp*(0.15+2.2*Math.pow(hcell(cx,cy,cz,k+5),9))*Math.exp(-(ch*ch)/(sig*sig));
+    if(br>1e-4){
+      blackbody(2600+11000*Math.pow(hcell(cx,cy,cz,k+6),2),_bb);
+      out[0]+=_bb[0]*br;out[1]+=_bb[1]*br;out[2]+=_bb[2]*br;
+    }
+  }
+  const gd=dx*GN[0]+dy*GN[1]+dz*GN[2];
+  const band=Math.exp(-Math.pow(gd*4.5,2));
+  if(band>1e-3){
+    const mx=(dx*GX[0]+dy*GX[1]+dz*GX[2])*3.5, my=(dx*GY[0]+dy*GY[1]+dz*GY[2])*3.5;
+    const neb=fbm(mx,my,401);
+    const du=fbm(mx*2.1+7.3,my*2.1+7.3,509);
+    const dust=du<0.42?0:(du>0.72?1:(du-0.42)/0.30*(du-0.42)/0.30*(3-2*(du-0.42)/0.30));
+    const g1=band*(0.030+0.085*neb)*(1-0.75*dust);
+    out[0]+=g1*0.72+band*0.012*0.9; out[1]+=g1*0.78+band*0.012*0.75; out[2]+=g1*0.95+band*0.012*0.6;
+  }
+}
+function diskCol(Xx,Xy,r,g,t,o,out){
+  const om=1/Math.sqrt(2*r*r*r);
+  const a2=Math.atan2(Xy,Xx)-om*t;
+  const px=Math.cos(a2)*r*0.85, py=Math.sin(a2)*r*0.85;
+  let pat=0.70+0.62*fbm(px,py,701);
+  pat*=0.82+0.36*vnoise(r*3.1,0,809);
+  const Tem=o.tmax*Math.pow(r,-0.75)*Math.pow(Math.max(1-Math.sqrt(RIN/r),1e-4),0.25)/PMAX;
+  const gg=Math.max(g,0);
+  const I=Math.pow(gg*Tem/o.tmax,4)*pat*0.8;
+  const edge=(r<RIN*1.02?(r-RIN)/(RIN*0.02):1)*(r>o.rout*0.88?Math.max(0,1-(r-o.rout*0.88)/(o.rout*0.12)):1);
+  blackbody(gg*Tem,_bb);
+  out[0]=_bb[0]*I*edge;out[1]=_bb[1]*I*edge;out[2]=_bb[2]*I*edge;
+}
+function tonemap(x){const y=x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14);return Math.pow(Math.min(1,Math.max(0,y)),0.4545);}
+
+/* ===================== honesty tests (CPU, float64 reference) ===================== */
+const _out={};
+function deflect(b,opt){
+  const r0=1000;
+  const sp=b*Math.sqrt(1-1/r0)/r0, cp=-Math.sqrt(1-sp*sp);
+  const code=traceRay(r0,0,0,cp,sp,0,opt,_out);
+  if(code!==0)return null;
+  const dot=cp*_out.dx+sp*_out.dy;
+  return {alpha:Math.acos(Math.min(1,Math.max(-1,dot))),drift:_out.drift||0};
+}
+const REF={dphi:0.005,steps:25200,rEsc:2000,disk:false,fr:false,track:true};
+function renderOpt(fr){return {dphi:6*Math.PI/params.steps,steps:params.steps,rEsc:2000,disk:false,fr:fr};}
+function runHonesty(){
+  // photon ring by bisection: captured vs escaped
+  let lo=2.0,hi=3.3;
+  const bopt={dphi:0.005,steps:25200,rEsc:2000,disk:false,fr:false};
+  for(let i=0;i<80;i++){const mid=(lo+hi)/2; if(deflect(mid,bopt)===null)lo=mid;else hi=mid;}
+  const bcrit=(lo+hi)/2, relRing=Math.abs(bcrit-BCRIT_TH)/BCRIT_TH;
+  el.rRing.textContent=bcrit.toFixed(7)+' rs';
+  setPill(el.vRing, relRing<1e-6?'ok':(relRing<1e-4?'warn':'bad'), 'Δ '+expFmt(relRing));
+  // weak field vs GR (α = 4M/b + 15π/4 (M/b)², M = 1/2)
+  const wf=deflect(50,REF);
+  const aTh=2/50+15*Math.PI/16/2500;
+  const relW=Math.abs(wf.alpha-aTh)/aTh;
+  el.rWeak.textContent=(wf.alpha/RAD).toFixed(4)+'° · GR '+(aTh/RAD).toFixed(4)+'°';
+  setPill(el.vWeak, relW<0.005?'ok':(relW<0.02?'warn':'bad'), 'Δ '+(relW*100).toFixed(2)+'%');
+  // render-grade vs reference at a strongly bent ray
+  const ref=deflect(2.7,REF), rg=deflect(2.7,renderOpt(false));
+  if(rg===null){el.rGrade.textContent='ray lost (steps too few)';setPill(el.vGrade,'warn','winds out');}
+  else{
+    const da=Math.abs(rg.alpha-ref.alpha)/RAD;
+    el.rGrade.textContent=da.toFixed(4)+'° @ b = 2.7 rs';
+    setPill(el.vGrade, da<0.2?'ok':(da<1?'warn':'bad'), da<0.2?'faithful':'coarse');
+  }
+  // float32 toll: same render-grade ray with float32 rounding each step
+  const r32=deflect(2.7,renderOpt(true));
+  el.rF32.textContent=(rg&&r32)?('+'+(Math.abs(r32.alpha-rg.alpha)/RAD).toFixed(4)+'°'):'—';
+}
+function expFmt(x){ if(x===0)return '0'; const e=Math.floor(Math.log10(x)); return (x/Math.pow(10,e)).toFixed(1)+'×10'+supExp(e); }
+function supExp(e){const S={'-':'⁻','0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};return String(e).split('').map(c=>S[c]).join('');}
+
+/* ===================== WebGL2 engine ===================== */
+const glCanvas=document.getElementById('gl');
+const cpuCanvas=document.getElementById('cpu');
+const ctx2d=cpuCanvas.getContext('2d');
+const gl=glCanvas.getContext('webgl2',{antialias:false,powerPreference:'high-performance'});
+let gpuOK=!!gl;
+function sh(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+  if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s;}
+function prog(vs,fs){const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));
+  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p;}
+function uni(p){const o={},n=gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);
+  for(let i=0;i<n;i++){const u=gl.getActiveUniform(p,i);o[u.name]=gl.getUniformLocation(p,u.name);}return o;}
+
+const QUAD_VS=`#version 300 es
+void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.0-1.0,0.0,1.0);}`;
+const TRACE_FS=`#version 300 es
+precision highp float; precision highp int;
+out vec4 frag;
+uniform vec2 uRes;
+uniform vec3 uCam,uRight,uUp,uFwd;
+uniform float uTanF,uDphi,uREsc,uRout,uTmax,uPmax,uTime;
+uniform float uLens,uDopp,uGrav,uDisk;
+uniform int uSteps;
+uniform uint uSeed;
+const float RIN=3.0;
+uint uhash(uint x){x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;x^=x>>16;return x;}
+float hcell(ivec3 c,uint k){return float(uhash((uint(c.x)*73856093u^uint(c.y)*19349663u^uint(c.z)*83492791u)^k^uSeed))*2.3283064365386963e-10;}
+float hi2(int x,int y,uint k){return float(uhash((uint(x)*73856093u^uint(y)*19349663u)^k^uSeed))*2.3283064365386963e-10;}
+float vnoise(vec2 p,uint k){
+  vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);
+  int x=int(i.x),y=int(i.y);
+  float a=hi2(x,y,k),b=hi2(x+1,y,k),c=hi2(x,y+1,k),d=hi2(x+1,y+1,k);
+  return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);
+}
+float fbm(vec2 p,uint k){return 0.55*vnoise(p,k)+0.28*vnoise(p*2.63,k+7u)+0.17*vnoise(p*6.17,k+13u);}
+vec3 blackbody(float T){
+  T=clamp(T,1000.0,40000.0);
+  float t=T*0.01,r,g,b;
+  if(T<6600.0){r=255.0;g=99.4708025861*log(t)-161.1195681661;b=(T<1900.0)?0.0:138.5177312231*log(t-10.0)-305.0447927307;}
+  else{r=329.698727446*pow(t-60.0,-0.1332047592);g=288.1221695283*pow(t-60.0,-0.0755148492);b=255.0;}
+  vec3 c=clamp(vec3(r,g,b)/255.0,0.0,1.0);
+  return c*c;
+}
+vec3 starShell(vec3 d,float S,float amp,uint k,float sz0){
+  ivec3 c=ivec3(floor(d*S));
+  float h0=hcell(c,k);
+  if(h0>0.17)return vec3(0.0);
+  vec3 sd=normalize(vec3(c)+vec3(hcell(c,k+1u),hcell(c,k+2u),hcell(c,k+3u)));
+  float ch=length(d-sd);
+  float sig=sz0*(1.1+2.5*pow(hcell(c,k+4u),8.0));
+  float br=amp*(0.15+2.2*pow(hcell(c,k+5u),9.0))*exp(-(ch*ch)/(sig*sig));
+  if(br<1e-4)return vec3(0.0);
+  return blackbody(2600.0+11000.0*pow(hcell(c,k+6u),2.0))*br;
+}
+vec3 sky(vec3 d){
+  float pxAng=2.0*uTanF/uRes.y;
+  vec3 col=starShell(d,23.0,0.7,101u,pxAng*1.3)
+          +starShell(d,47.0,0.5,211u,pxAng*1.1)
+          +starShell(d,89.0,0.32,307u,pxAng*1.0);
+  vec3 gn=normalize(vec3(0.42,0.10,0.90));
+  vec3 gx=normalize(cross(gn,vec3(0.0,1.0,0.0)));
+  vec3 gy=cross(gn,gx);
+  float band=exp(-pow(dot(d,gn)*4.5,2.0));
+  if(band>1e-3){
+    vec2 mp=vec2(dot(d,gx),dot(d,gy))*3.5;
+    float neb=fbm(mp,401u);
+    float dust=smoothstep(0.42,0.72,fbm(mp*2.1+7.3,509u));
+    col+=band*(0.030+0.085*neb)*(1.0-0.75*dust)*vec3(0.72,0.78,0.95);
+    col+=band*0.012*vec3(0.9,0.75,0.6);
+  }
+  return col;
+}
+vec3 diskShade(vec2 X,float r,float g){
+  float om=inversesqrt(2.0*r*r*r);
+  float a2=atan(X.y,X.x)-om*uTime;
+  vec2 pp=vec2(cos(a2),sin(a2))*r*0.85;
+  float pat=0.70+0.62*fbm(pp,701u);
+  pat*=0.82+0.36*vnoise(vec2(r*3.1,0.0),809u);
+  float Tem=uTmax*pow(r,-0.75)*pow(max(1.0-sqrt(RIN/r),1e-4),0.25)/uPmax;
+  float gg=max(g,0.0);
+  float I=pow(gg*Tem/uTmax,4.0)*pat*0.8;
+  float edge=smoothstep(RIN,RIN*1.02,r)*(1.0-smoothstep(uRout*0.88,uRout,r));
+  return blackbody(gg*Tem)*I*edge;
+}
+void main(){
+  vec2 q=(gl_FragCoord.xy*2.0-uRes)/uRes.y;
+  vec3 rd=normalize(uFwd+uTanF*(q.x*uRight+q.y*uUp));
+  vec3 ro=uCam;
+  float r0=length(ro);
+  vec3 col=vec3(0.0);
+  if(uLens<0.5){
+    float tb=dot(-ro,rd),d2=dot(ro,ro)-tb*tb;
+    float tBH=(d2<1.0&&tb>0.0)?tb-sqrt(1.0-d2):1e30;
+    float tD=(abs(rd.z)>1e-9)?(-ro.z/rd.z):1e30;
+    bool hitD=false;
+    if(uDisk>0.5&&tD>0.0&&tD<tBH){
+      vec3 X=ro+tD*rd; float rx=length(X.xy);
+      if(rx>=RIN&&rx<=uRout){
+        hitD=true;
+        float lz=ro.x*rd.y-ro.y*rd.x;
+        float om=inversesqrt(2.0*rx*rx*rx);
+        float gden=(uDopp>0.5)?(1.0-om*lz):1.0;
+        float gnum=(uGrav>0.5)?sqrt(max(1.0-1.5/rx,0.0))/sqrt(1.0-1.0/r0):1.0;
+        col=diskShade(X.xy,rx,gnum/max(gden,1e-3));
+      }
+    }
+    if(!hitD){ col=(tBH<1e29)?vec3(0.0):sky(rd); }
+  }else{
+    vec3 e1=ro/r0;
+    float cp=dot(rd,e1);
+    vec3 ev=rd-cp*e1;
+    float sp=length(ev);
+    if(sp<1e-6){ col=(cp<0.0)?vec3(0.0):sky(rd); }
+    else{
+      vec3 e2=ev/sp;
+      float e3z=e1.x*e2.y-e1.y*e2.x;
+      float b=r0*sp*inversesqrt(1.0-1.0/r0);
+      float u=1.0/r0;
+      float w=sqrt(max(1.0/(b*b)-u*u*(1.0-u),0.0))*((cp<0.0)?1.0:-1.0);
+      float h=uDphi,uEsc=1.0/uREsc;
+      float phi=0.0,Ap=e1.z,up=u;
+      for(int i=0;i<2600;i++){
+        if(i>=uSteps)break;
+        float k1u=w,k1w=1.5*u*u-u;
+        float au=u+0.5*h*k1u,aw=w+0.5*h*k1w;
+        float k2u=aw,k2w=1.5*au*au-au;
+        au=u+0.5*h*k2u;aw=w+0.5*h*k2w;
+        float k3u=aw,k3w=1.5*au*au-au;
+        au=u+h*k3u;aw=w+h*k3w;
+        float k4u=aw,k4w=1.5*au*au-au;
+        u+=h*(k1u+2.0*(k2u+k3u)+k4u)/6.0;
+        w+=h*(k1w+2.0*(k2w+k3w)+k4w)/6.0;
+        phi+=h;
+        if(u>=1.0)break;                       // shadow
+        float cs=cos(phi),sn=sin(phi);
+        float A=cs*e1.z+sn*e2.z;
+        if(uDisk>0.5&&A*Ap<0.0){
+          float f=Ap/(Ap-A);
+          float ux=mix(up,u,f),rx=1.0/ux;
+          if(rx>=RIN&&rx<=uRout){
+            float phix=phi-h*(1.0-f);
+            vec3 X=(cos(phix)*e1+sin(phix)*e2)*rx;
+            float om=inversesqrt(2.0*rx*rx*rx);
+            float gden=(uDopp>0.5)?(1.0-om*b*e3z):1.0;
+            float gnum=(uGrav>0.5)?sqrt(max(1.0-1.5/rx,0.0))/sqrt(1.0-1.0/r0):1.0;
+            col=diskShade(X.xy,rx,gnum/max(gden,1e-3));
+            break;
+          }
+        }
+        Ap=A;up=u;
+        if(w<0.0&&u<uEsc){
+          vec2 t2=vec2(-sn*u-cs*w,cs*u-sn*w);
+          col=sky(normalize(t2.x*e1+t2.y*e2));
+          break;
+        }
+      }
+    }
+  }
+  col=col*(2.51*col+0.03)/(col*(2.43*col+0.59)+0.14);
+  frag=vec4(pow(clamp(col,0.0,1.0),vec3(0.4545)),1.0);
+}`;
+
+let pTrace=null,uT=null;
+if(gpuOK){
+  try{ pTrace=prog(QUAD_VS,TRACE_FS); uT=uni(pTrace); }
+  catch(e){ gpuOK=false; console.error(e); }
+}
+
+/* ===================== camera & input ===================== */
+const cam={yaw:0.9};
+function camBasis(){
+  const inc=Math.min(90,Math.max(0.5,params.inc))*RAD;
+  const si=Math.sin(inc),ci=Math.cos(inc);
+  const C=[params.dist*si*Math.cos(cam.yaw),params.dist*si*Math.sin(cam.yaw),params.dist*ci];
+  const F=norm3([-C[0],-C[1],-C[2]]);
+  let R=cross3(F,[0,0,1]);
+  const l=Math.hypot(R[0],R[1],R[2]);
+  R=l<1e-6?[1,0,0]:[R[0]/l,R[1]/l,R[2]/l];
+  const U=cross3(R,F);
+  return {C,F,R,U};
+}
+function attachNav(el){
+  const ptrs=new Map();let pinchD=0;
+  el.addEventListener('contextmenu',e=>e.preventDefault());
+  el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);el.classList.add('dragging');});
+  el.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);el.classList.remove('dragging');pinchD=0;});
+  el.addEventListener('pointercancel',e=>{ptrs.delete(e.pointerId);pinchD=0;});
+  el.addEventListener('pointermove',e=>{
+    if(!ptrs.has(e.pointerId))return;
+    const prev=ptrs.get(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+    if(ptrs.size===1){
+      cam.yaw-=(e.clientX-prev[0])*0.005;
+      params.inc=Math.min(90,Math.max(0.5,params.inc-(e.clientY-prev[1])*0.3));
+      syncSliders(); viewChanged();
+    }else if(ptrs.size===2){
+      const pts=[...ptrs.values()];const d=Math.hypot(pts[0][0]-pts[1][0],pts[0][1]-pts[1][1]);
+      if(pinchD>0){params.dist=Math.min(150,Math.max(2.5,params.dist*pinchD/d));syncSliders();viewChanged();}
+      pinchD=d;
+    }
+  });
+  el.addEventListener('wheel',e=>{e.preventDefault();
+    params.dist=Math.min(150,Math.max(2.5,params.dist*Math.exp(e.deltaY*0.0012)));
+    syncSliders(); viewChanged();
+  },{passive:false});
+}
+attachNav(glCanvas); attachNav(cpuCanvas);
+
+/* ===================== CPU engine (float64, progressive) ===================== */
+const cpuEng={W:0,H:0,img:null,row:0,done:false,frameT:0};
+function cpuStart(){
+  const scale=0.35*params.res;
+  cpuEng.W=Math.max(64,Math.round(glCanvas.clientWidth*scale));
+  cpuEng.H=Math.max(48,Math.round(glCanvas.clientHeight*scale));
+  if(cpuCanvas.width!==cpuEng.W)cpuCanvas.width=cpuEng.W;
+  if(cpuCanvas.height!==cpuEng.H)cpuCanvas.height=cpuEng.H;
+  cpuEng.img=ctx2d.createImageData(cpuEng.W,cpuEng.H);
+  cpuEng.row=0; cpuEng.done=false; cpuEng.frameT=simT;
+}
+const _px=[0,0,0], _o2={};
+function cpuChunk(budgetMs){
+  const t0=performance.now();
+  const {C,F,R,U}=camBasis();
+  const W=cpuEng.W,H=cpuEng.H,img=cpuEng.img.data;
+  const tanF=Math.tan(params.fov*RAD/2);
+  const pxAng=2*tanF/H;
+  const opt={dphi:6*Math.PI/params.steps,steps:params.steps,rEsc:Math.max(2*params.dist,400),
+    disk:params.disk>0,rout:params.rout,dopp:params.dopp>0,grav:params.grav>0,fr:false,tmax:params.tmax};
+  const lens=params.lens>0;
+  while(cpuEng.row<H){
+    const y=cpuEng.row;
+    const qy=-( (y+0.5)*2-H )/H;           // flip: ImageData rows go down
+    for(let x=0;x<W;x++){
+      const qx=((x+0.5)*2-W)/H;
+      let dx=F[0]+tanF*(qx*R[0]+qy*U[0]);
+      let dy=F[1]+tanF*(qx*R[1]+qy*U[1]);
+      let dz=F[2]+tanF*(qx*R[2]+qy*U[2]);
+      const dl=Math.hypot(dx,dy,dz); dx/=dl;dy/=dl;dz/=dl;
+      const code=lens?traceRay(C[0],C[1],C[2],dx,dy,dz,opt,_o2)
+                     :traceNewton(C[0],C[1],C[2],dx,dy,dz,opt,_o2);
+      if(code===1)diskCol(_o2.Xx,_o2.Xy,_o2.r,_o2.g,cpuEng.frameT,opt,_px);
+      else if(code===0)skyCol(_o2.dx,_o2.dy,_o2.dz,pxAng,_px);
+      else{_px[0]=0;_px[1]=0;_px[2]=0;}
+      const i4=(y*W+x)*4;
+      img[i4]=tonemap(_px[0])*255;img[i4+1]=tonemap(_px[1])*255;img[i4+2]=tonemap(_px[2])*255;img[i4+3]=255;
+    }
+    cpuEng.row++;
+    if(performance.now()-t0>budgetMs)break;
+  }
+  ctx2d.putImageData(cpuEng.img,0,0);
+  if(cpuEng.row>=H)cpuEng.done=true;
+}
+
+/* ===================== UI wiring ===================== */
+const $=id=>document.getElementById(id);
+const el={rRing:$('rRing'),vRing:$('vRing'),rWeak:$('rWeak'),vWeak:$('vWeak'),rGrade:$('rGrade'),vGrade:$('vGrade'),
+  rF32:$('rF32'),rFps:$('rFps'),rEng:$('rEng'),rFrame:$('rFrame'),rMray:$('rMray'),rProg:$('rProg'),progRow:$('progRow'),
+  rRs:$('rRs'),rIsco:$('rIsco'),rAng:$('rAng'),massHint:$('massHint'),clock:$('clock'),speedVal:$('speedVal'),
+  presetHint:$('presetHint'),banner:$('banner')};
+function setPill(p,cls,txt){p.className='pill '+cls;p.textContent=txt;}
+function showBanner(msg){el.banner.textContent=msg;el.banner.style.display='block';
+  setTimeout(()=>el.banner.style.display='none',7000);}
+
+const sliders={
+  inc:{el:$('inc'),val:$('incVal'),to:v=>v/10,from:v=>v*10,fmt:v=>v.toFixed(1)+'°'},
+  dist:{el:$('dist'),val:$('distVal'),to:v=>2.5*Math.pow(60,v/1000),from:v=>1000*Math.log(v/2.5)/Math.log(60),fmt:v=>v.toFixed(1)+' rs'},
+  fov:{el:$('fov'),val:$('fovVal'),to:v=>v,from:v=>v,fmt:v=>v.toFixed(0)+'°'},
+  rout:{el:$('rout'),val:$('routVal'),to:v=>v/10,from:v=>v*10,fmt:v=>v.toFixed(1)+' rs'},
+  tmax:{el:$('tmax'),val:$('tmaxVal'),to:v=>v,from:v=>v,fmt:v=>(v/1000).toFixed(1)+' kK'},
+  steps:{el:$('steps'),val:$('stepsVal'),to:v=>Math.round(v),from:v=>v,fmt:v=>String(Math.round(v))},
+  res:{el:$('res'),val:$('resVal'),to:v=>v/100,from:v=>v*100,fmt:v=>Math.round(v*100)+'%'},
+};
+for(const k in sliders){
+  const s=sliders[k];
+  s.el.addEventListener('input',()=>{
+    params[k]=s.to(+s.el.value);
+    s.val.textContent=s.fmt(params[k]);
+    clearPreset();
+    if(k==='res'&&params.mode==='gpu')resizeGL();
+    if(k==='steps')scheduleHonesty();
+    viewChanged();
+  });
+}
+function syncSliders(){for(const k in sliders){const s=sliders[k];s.el.value=s.from(params[k]);s.val.textContent=s.fmt(params[k]);}}
+
+const fxBtns=[...$('fxBtns').querySelectorAll('button')];
+fxBtns.forEach(b=>b.addEventListener('click',()=>{
+  const f=b.dataset.f;
+  params[f]=params[f]?0:1;
+  b.classList.toggle('on',!!params[f]);
+  clearPreset(); viewChanged();
+}));
+function syncFx(){fxBtns.forEach(b=>b.classList.toggle('on',!!params[b.dataset.f]));}
+
+const presetBtns=[...$('presetBtns').querySelectorAll('button')];
+presetBtns.forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.p)));
+function applyPreset(p){
+  const P=PRESETS[p];
+  for(const k of ['inc','dist','fov','rout','tmax','disk','lens','dopp','grav','mass'])params[k]=P[k];
+  presetBtns.forEach(b=>b.classList.toggle('on',b.dataset.p===p));
+  el.presetHint.textContent=P.hint;
+  syncSliders();syncFx();syncMass();updateRuler();
+  if(params.mode==='gpu')resizeGL();
+  viewChanged();
+}
+function clearPreset(){presetBtns.forEach(b=>b.classList.remove('on'));el.presetHint.textContent='';}
+
+const massBtns=[...$('massSeg').querySelectorAll('button')];
+massBtns.forEach(b=>b.addEventListener('click',()=>{params.mass=+b.dataset.m;syncMass();updateRuler();}));
+function syncMass(){massBtns.forEach(b=>b.classList.toggle('on',+b.dataset.m===params.mass));}
+
+const engBtns=[...$('engSeg').querySelectorAll('button')];
+engBtns.forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.m)));
+function setMode(m){
+  if(m==='gpu'&&!gpuOK){showBanner('WebGL2 isn’t available here — the float64 CPU engine carries on alone.');m='cpu';}
+  params.mode=m;
+  engBtns.forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  cpuCanvas.style.display=m==='cpu'?'block':'none';
+  el.progRow.style.display=m==='cpu'?'flex':'none';
+  setPill(el.rEng,m==='cpu'?'warn':'ok',m==='cpu'?'CPU · float64':'GPU · float32');
+  if(m==='cpu')cpuStart(); else resizeGL();
+}
+
+$('reseed').addEventListener('click',()=>{skySeed=(rng()*4294967296)>>>0;viewChanged();});
+
+const playBtn=$('playBtn'),speedSl=$('speed');
+playBtn.addEventListener('click',()=>{playing=!playing;playBtn.textContent=playing?'❚❚':'▶';});
+playBtn.textContent=playing?'❚❚':'▶';
+speedSl.addEventListener('input',()=>{params.speed=0.5*Math.pow(10,3*(+speedSl.value)/1000);updateSpeedLabel();});
+function updateSpeedLabel(){el.speedVal.textContent=params.speed.toFixed(params.speed<10?1:0)+' rs/c ·s⁻¹';}
+params.speed=0.5*Math.pow(10,3*490/1000);
+
+function updateRuler(){
+  const m=MASSES[params.mass];
+  const rs_km=KM_PER_MSUN*m.M;
+  el.rRs.textContent=rs_km>1e6?(rs_km/1.496e8).toPrecision(3)+' AU':fmtNum(rs_km)+' km';
+  el.rIsco.textContent=fmtTime(ISCO_T*S_PER_MSUN*m.M);
+  const ang_uas=BCRIT_TH*2*rs_km/(m.D_kpc*KPC_KM)*2.0626480624709636e11;
+  el.rAng.textContent=ang_uas>=0.01?ang_uas.toFixed(1)+' μas':expFmt(ang_uas)+' μas';
+  el.massHint.textContent=m.note+'. The geometry on screen is scale-free; the mass only sets the ruler and the clock.';
+}
+function fmtNum(x){return x>=1e4?x.toExponential(2).replace('e+','×10'):(x>=100?x.toFixed(0):x.toPrecision(3));}
+function fmtTime(s){
+  if(s<1e-3)return (s*1e6).toPrecision(3)+' μs';
+  if(s<1)return (s*1e3).toPrecision(3)+' ms';
+  if(s<120)return s.toPrecision(3)+' s';
+  if(s<7200)return (s/60).toPrecision(3)+' min';
+  if(s<172800)return (s/3600).toPrecision(3)+' h';
+  if(s<6.3e7)return (s/86400).toPrecision(3)+' days';
+  return (s/3.156e7).toPrecision(3)+' yr';
+}
+
+/* honesty tests: deferred + debounced */
+let honestyTimer=null;
+function scheduleHonesty(){clearTimeout(honestyTimer);honestyTimer=setTimeout(runHonesty,350);}
+
+/* view-change hook: the CPU engine restarts its progressive frame */
+function viewChanged(){ if(params.mode==='cpu')cpuStart(); }
+
+/* ===================== GL sizing & render ===================== */
+function resizeGL(){
+  if(!gpuOK)return;
+  const dpr=Math.min(2,devicePixelRatio||1);
+  const W=Math.max(64,Math.round(glCanvas.clientWidth*dpr*params.res));
+  const H=Math.max(48,Math.round(glCanvas.clientHeight*dpr*params.res));
+  if(glCanvas.width!==W)glCanvas.width=W;
+  if(glCanvas.height!==H)glCanvas.height=H;
+}
+addEventListener('resize',()=>{resizeGL();if(params.mode==='cpu')cpuStart();});
+
+function renderGL(){
+  const {C,F,R,U}=camBasis();
+  gl.viewport(0,0,glCanvas.width,glCanvas.height);
+  gl.useProgram(pTrace);
+  gl.uniform2f(uT.uRes,glCanvas.width,glCanvas.height);
+  gl.uniform3f(uT.uCam,C[0],C[1],C[2]);
+  gl.uniform3f(uT.uRight,R[0],R[1],R[2]);
+  gl.uniform3f(uT.uUp,U[0],U[1],U[2]);
+  gl.uniform3f(uT.uFwd,F[0],F[1],F[2]);
+  gl.uniform1f(uT.uTanF,Math.tan(params.fov*RAD/2));
+  gl.uniform1f(uT.uDphi,6*Math.PI/params.steps);
+  gl.uniform1f(uT.uREsc,Math.max(2*params.dist,400));
+  gl.uniform1f(uT.uRout,params.rout);
+  gl.uniform1f(uT.uTmax,params.tmax);
+  gl.uniform1f(uT.uPmax,PMAX);
+  gl.uniform1f(uT.uTime,simT);
+  gl.uniform1f(uT.uLens,params.lens);
+  gl.uniform1f(uT.uDopp,params.dopp);
+  gl.uniform1f(uT.uGrav,params.grav);
+  gl.uniform1f(uT.uDisk,params.disk);
+  gl.uniform1i(uT.uSteps,params.steps);
+  gl.uniform1ui(uT.uSeed,skySeed);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+
+/* ===================== main loop ===================== */
+let lastT=performance.now(), fpsAcc=0, fpsN=0, fpsShown=0, lastUI=0;
+function frame(now){
+  const dt=Math.min(0.1,(now-lastT)/1000); lastT=now;
+  if(playing)simT+=dt*params.speed;
+  if(params.mode==='gpu'&&gpuOK){
+    renderGL();
+  }else{
+    if(cpuEng.done&&playing){cpuStart();}      // next honest frame
+    if(!cpuEng.done)cpuChunk(14);
+  }
+  fpsAcc+=dt;fpsN++;
+  if(now-lastUI>500){
+    fpsShown=fpsN/Math.max(fpsAcc,1e-3);fpsAcc=0;fpsN=0;lastUI=now;
+    el.rFps.textContent=fpsShown.toFixed(0);
+    const W=params.mode==='gpu'?glCanvas.width:cpuEng.W, H=params.mode==='gpu'?glCanvas.height:cpuEng.H;
+    el.rFrame.textContent=W+' × '+H+' px';
+    el.rMray.textContent=params.mode==='gpu'
+      ? ((W*H*fpsShown)/1e6).toFixed(1)+' M/s'
+      : ((cpuEng.W*cpuEng.H*(cpuEng.done?1:cpuEng.row/Math.max(1,cpuEng.H))/1)/1e3).toFixed(0)+' k/frame';
+    if(params.mode==='cpu')el.rProg.textContent=cpuEng.done?'done':Math.round(100*cpuEng.row/cpuEng.H)+'%';
+    const m=MASSES[params.mass];
+    el.clock.textContent='t = '+Math.round(simT)+' rs/c ≙ '+fmtTime(simT*S_PER_MSUN*m.M);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ===================== boot ===================== */
+syncSliders();syncFx();syncMass();updateRuler();updateSpeedLabel();
+applyPreset('furnace');
+if(!gpuOK){
+  showBanner('WebGL2 isn’t available — running on the float64 CPU engine alone. Patient, but honest.');
+  setMode('cpu');
+}else{
+  setMode('gpu');
+}
+setTimeout(runHonesty,200);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
