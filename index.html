@@ -211,9 +211,9 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
     <h3>2 · Why the picture looks like that</h3>
     <p>The bright halo hugging the shadow is the <b>photon ring</b>: rays with impact parameter near b = 3√3⁄2&thinsp;r<sub>s</sub> ≈ 2.598&thinsp;r<sub>s</sub> circle the hole one or more times before escaping, so a thin annulus of sky carries an image of the entire disk, repeated. The disk’s far side doesn’t hide behind the hole: rays passing over the pole are bent down onto its top surface, so you see it <b>arched above the shadow</b> (and its underside mirrored below — the Interstellar look). And the two wings are unequal because the gas orbits at nearly half the speed of light at the inner edge: relativistic <b>Doppler beaming</b> brightens the approaching side by roughly g⁴, where g is the frequency shift. Toggle the effects off one at a time and the portrait falls apart into a Newtonian saucer.</p>
     <h3>3 · The disk</h3>
-    <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest.</p>
+    <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest. The outer rim fades out gradually and raggedly rather than at a hard circle, and it goes <b>optically thin</b> as it fades — rays keep going through the last wisps, so the lensed sky (and the disk’s own far side) shines through. Real disks end in a taper, not a cliff, though the taper’s exact shape here is aesthetic, not derived.</p>
     <h3>4 · Honest caveats</h3>
-    <p><b>No spin.</b> This is Schwarzschild; real black holes rotate. Kerr spacetime drags frames, shrinks the ISCO (as low as 0.5&thinsp;r<sub>s</sub> of gravitational radius for maximal spin), and makes the shadow slightly D-shaped — percent-level corrections to the ring, big corrections to the inner disk. <b>The disk is opaque and thin</b>; M87*’s real glow is synchrotron plasma, not a blackbody, and no polarization is computed here. <b>The camera hovers</b> — a static Schwarzschild observer, engines burning, not a free-falling one. The background sky is procedural, not a star catalog. And a confession from Hollywood: Interstellar’s Gargantua deliberately <i>omitted</i> Doppler beaming and blue/red shifts so the disk would look symmetric and golden on screen — the preset above reproduces that choice; flip “Doppler &amp; beaming” back on to see what Kip Thorne’s honest version looks like.</p>
+    <p><b>No spin.</b> This is Schwarzschild; real black holes rotate. Kerr spacetime drags frames, shrinks the ISCO (as low as 0.5&thinsp;r<sub>s</sub> of gravitational radius for maximal spin), and makes the shadow slightly D-shaped — percent-level corrections to the ring, big corrections to the inner disk. <b>The disk is opaque and thin</b> (except its tapering rim, which is allowed to go optically thin); M87*’s real glow is synchrotron plasma, not a blackbody, and no polarization is computed here. <b>The camera hovers</b> — a static Schwarzschild observer, engines burning, not a free-falling one. The background sky is procedural, not a star catalog. And a confession from Hollywood: Interstellar’s Gargantua deliberately <i>omitted</i> Doppler beaming and blue/red shifts so the disk would look symmetric and golden on screen — the preset above reproduces that choice; flip “Doppler &amp; beaming” back on to see what Kip Thorne’s honest version looks like.</p>
     <p class="fn"><b>Numerical method:</b> per pixel, the ray’s plane is found from camera position and pixel direction (Schwarzschild orbits are planar), the Binet equation above is advanced by RK4 with dφ = 6π/steps, and disk crossings are detected by sign change of the plane-height and interpolated within the step. Escape is declared when the ray moves outward past r = max(2r<sub>cam</sub>, 400&thinsp;r<sub>s</sub>); its tangent there is the sky direction (the residual bending beyond that radius is ~2Mb/r² ≲ 10⁻⁵ rad). Rays that exhaust the step budget while winding are charged to the shadow — that is what the quality slider trades.</p>
     <p class="fn"><b>Two engines:</b> the GPU renders every pixel in parallel in float32 fragment shaders; the CPU engine renders the identical algorithm in float64, progressively, as the reference. The honesty panel quantifies both sins: integration error (render-grade vs 25,000-step reference ray) and arithmetic error (the same ray replayed with float32 rounding after every step).</p>
     <p class="fn"><b>Units:</b> G = c = 1, lengths in Schwarzschild radii (M = ½), time in r<sub>s</sub>/c. Blackbody colors via a standard Planckian-locus fit, ACES-style tone mapping. The mass buttons change no physics — only the physical ruler: r<sub>s</sub> in kilometres, the ISCO clock, and the ring’s angular size from Earth (52 μas for Sgr A*, ~40 μas for M87* — the sizes the Event Horizon Telescope photographed).</p>
@@ -267,7 +267,9 @@ function cross3(a,b){return[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[
 
 /* ===================== geodesic core (shared by CPU engine & honesty tests) =====================
    Binet equation u'' = -u + 1.5 u² (rs=1), RK4 in φ. Returns:
-   0 = sky (out.dx/dy/dz set), 1 = disk (out.r, out.Xx/Xy, out.g set), 2 = captured/wound out. */
+   0 = sky (out.dx/dy/dz set), 2 = captured/absorbed/wound out.
+   Disk crossings are reported to o.onHit(r, Xx, Xy, g), which returns false once the
+   accumulated optical depth is opaque — the ray then stops (semi-transparent rim). */
 function traceRay(ox,oy,oz,dx,dy,dz,o,out){
   const r0=Math.sqrt(ox*ox+oy*oy+oz*oz);
   let e1x=ox/r0,e1y=oy/r0,e1z=oz/r0;
@@ -304,13 +306,11 @@ function traceRay(ox,oy,oz,dx,dy,dz,o,out){
       const ux=up+f*(u-up), rx=1/ux;
       if(rx>=RIN&&rx<=o.rout){
         const phix=phi-h*(1-f), c2=Math.cos(phix), s2=Math.sin(phix);
-        out.r=rx;
-        out.Xx=(c2*e1x+s2*e2x)*rx; out.Xy=(c2*e1y+s2*e2y)*rx;
+        const Xx=(c2*e1x+s2*e2x)*rx, Xy=(c2*e1y+s2*e2y)*rx;
         const om=1/Math.sqrt(2*rx*rx*rx);
         const gden=o.dopp?(1-om*b*e3z):1;
         const gnum=o.grav?Math.sqrt(Math.max(1-1.5/rx,0))/Math.sqrt(1-1/r0):1;
-        out.g=gnum/Math.max(gden,1e-3);
-        return 1;
+        if(!o.onHit(rx,Xx,Xy,gnum/Math.max(gden,1e-3)))return 2;
       }
     }
     Ap=A; up=u;
@@ -338,8 +338,7 @@ function traceNewton(ox,oy,oz,dx,dy,dz,o,out){
       const om=1/Math.sqrt(2*rx*rx*rx);
       const gden=o.dopp?(1-om*lz):1;
       const gnum=o.grav?Math.sqrt(Math.max(1-1.5/rx,0))/Math.sqrt(1-1/r0):1;
-      out.r=rx; out.Xx=Xx; out.Xy=Xy; out.g=gnum/Math.max(gden,1e-3);
-      return 1;
+      if(!o.onHit(rx,Xx,Xy,gnum/Math.max(gden,1e-3)))return 2;
     }
   }
   if(tBH<1e29)return 2;
@@ -408,9 +407,14 @@ function diskCol(Xx,Xy,r,g,t,o,out){
   const Tem=o.tmax*Math.pow(r,-0.75)*Math.pow(Math.max(1-Math.sqrt(RIN/r),1e-4),0.25)/PMAX;
   const gg=Math.max(g,0);
   const I=Math.pow(gg*Tem/o.tmax,4)*pat*0.8;
-  const edge=(r<RIN*1.02?(r-RIN)/(RIN*0.02):1)*(r>o.rout*0.88?Math.max(0,1-(r-o.rout*0.88)/(o.rout*0.12)):1);
+  const rim=o.rout*(0.50+0.22*fbm(px*0.3,py*0.3,977));   // ragged, turbulence-modulated outer rim
+  let f=Math.min(1,Math.max(0,(r-rim)/(o.rout-rim)));
+  f=1-f*f*(3-2*f);
+  let sIn=Math.min(1,Math.max(0,(r-RIN)/(RIN*0.02)));
+  const edge=sIn*sIn*(3-2*sIn)*f*f;
   blackbody(gg*Tem,_bb);
   out[0]=_bb[0]*I*edge;out[1]=_bb[1]*I*edge;out[2]=_bb[2]*I*edge;
+  return edge;                                // opacity, for compositing
 }
 function tonemap(x){const y=x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14);return Math.pow(Math.min(1,Math.max(0,y)),0.4545);}
 
@@ -527,7 +531,7 @@ vec3 sky(vec3 d){
   }
   return col;
 }
-vec3 diskShade(vec2 X,float r,float g){
+vec4 diskShade(vec2 X,float r,float g){    // rgb = emission·opacity, a = opacity
   float om=inversesqrt(2.0*r*r*r);
   float a2=atan(X.y,X.x)-om*uTime;
   vec2 pp=vec2(cos(a2),sin(a2))*r*0.85;
@@ -536,8 +540,10 @@ vec3 diskShade(vec2 X,float r,float g){
   float Tem=uTmax*pow(r,-0.75)*pow(max(1.0-sqrt(RIN/r),1e-4),0.25)/uPmax;
   float gg=max(g,0.0);
   float I=pow(gg*Tem/uTmax,4.0)*pat*0.8;
-  float edge=smoothstep(RIN,RIN*1.02,r)*(1.0-smoothstep(uRout*0.88,uRout,r));
-  return blackbody(gg*Tem)*I*edge;
+  float rim=uRout*(0.50+0.22*fbm(pp*0.3,977u));   // ragged, turbulence-modulated outer rim
+  float fade=1.0-smoothstep(rim,uRout,r);
+  float edge=smoothstep(RIN,RIN*1.02,r)*fade*fade;
+  return vec4(blackbody(gg*Tem)*I*edge,edge);
 }
 void main(){
   vec2 q=(gl_FragCoord.xy*2.0-uRes)/uRes.y;
@@ -549,19 +555,19 @@ void main(){
     float tb=dot(-ro,rd),d2=dot(ro,ro)-tb*tb;
     float tBH=(d2<1.0&&tb>0.0)?tb-sqrt(1.0-d2):1e30;
     float tD=(abs(rd.z)>1e-9)?(-ro.z/rd.z):1e30;
-    bool hitD=false;
+    vec3 acc=vec3(0.0); float trans=1.0;
     if(uDisk>0.5&&tD>0.0&&tD<tBH){
       vec3 X=ro+tD*rd; float rx=length(X.xy);
       if(rx>=RIN&&rx<=uRout){
-        hitD=true;
         float lz=ro.x*rd.y-ro.y*rd.x;
         float om=inversesqrt(2.0*rx*rx*rx);
         float gden=(uDopp>0.5)?(1.0-om*lz):1.0;
         float gnum=(uGrav>0.5)?sqrt(max(1.0-1.5/rx,0.0))/sqrt(1.0-1.0/r0):1.0;
-        col=diskShade(X.xy,rx,gnum/max(gden,1e-3));
+        vec4 dc=diskShade(X.xy,rx,gnum/max(gden,1e-3));
+        acc=dc.rgb; trans=1.0-dc.a;
       }
     }
-    if(!hitD){ col=(tBH<1e29)?vec3(0.0):sky(rd); }
+    col=acc+trans*((tBH<1e29)?vec3(0.0):sky(rd));
   }else{
     vec3 e1=ro/r0;
     float cp=dot(rd,e1);
@@ -576,6 +582,7 @@ void main(){
       float w=sqrt(max(1.0/(b*b)-u*u*(1.0-u),0.0))*((cp<0.0)?1.0:-1.0);
       float h=uDphi,uEsc=1.0/uREsc;
       float phi=0.0,Ap=e1.z,up=u;
+      vec3 acc=vec3(0.0); float trans=1.0;
       for(int i=0;i<2600;i++){
         if(i>=uSteps)break;
         float k1u=w,k1w=1.5*u*u-u;
@@ -600,17 +607,20 @@ void main(){
             float om=inversesqrt(2.0*rx*rx*rx);
             float gden=(uDopp>0.5)?(1.0-om*b*e3z):1.0;
             float gnum=(uGrav>0.5)?sqrt(max(1.0-1.5/rx,0.0))/sqrt(1.0-1.0/r0):1.0;
-            col=diskShade(X.xy,rx,gnum/max(gden,1e-3));
-            break;
+            vec4 dc=diskShade(X.xy,rx,gnum/max(gden,1e-3));
+            acc+=trans*dc.rgb;                 // emission through what's in front
+            trans*=1.0-dc.a;                   // absorption; opaque body stops the ray
+            if(trans<0.02)break;
           }
         }
         Ap=A;up=u;
         if(w<0.0&&u<uEsc){
           vec2 t2=vec2(-sn*u-cs*w,cs*u-sn*w);
-          col=sky(normalize(t2.x*e1+t2.y*e2));
+          acc+=trans*sky(normalize(t2.x*e1+t2.y*e2));
           break;
         }
       }
+      col=acc;
     }
   }
   col=col*(2.51*col+0.03)/(col*(2.43*col+0.59)+0.14);
@@ -673,7 +683,8 @@ function cpuStart(){
   cpuEng.img=ctx2d.createImageData(cpuEng.W,cpuEng.H);
   cpuEng.row=0; cpuEng.done=false; cpuEng.frameT=simT;
 }
-const _px=[0,0,0], _o2={};
+const _px=[0,0,0], _acc=[0,0,0], _o2={};
+let _trans=1;
 function cpuChunk(budgetMs){
   const t0=performance.now();
   const {C,F,R,U}=camBasis();
@@ -682,6 +693,12 @@ function cpuChunk(budgetMs){
   const pxAng=2*tanF/H;
   const opt={dphi:6*Math.PI/params.steps,steps:params.steps,rEsc:Math.max(2*params.dist,400),
     disk:params.disk>0,rout:params.rout,dopp:params.dopp>0,grav:params.grav>0,fr:false,tmax:params.tmax};
+  opt.onHit=(rx,Xx,Xy,g)=>{                  // composite front-to-back, mirror of the GLSL loop
+    const a=diskCol(Xx,Xy,rx,g,cpuEng.frameT,opt,_px);
+    _acc[0]+=_trans*_px[0];_acc[1]+=_trans*_px[1];_acc[2]+=_trans*_px[2];
+    _trans*=1-a;
+    return _trans>=0.02;
+  };
   const lens=params.lens>0;
   while(cpuEng.row<H){
     const y=cpuEng.row;
@@ -692,13 +709,15 @@ function cpuChunk(budgetMs){
       let dy=F[1]+tanF*(qx*R[1]+qy*U[1]);
       let dz=F[2]+tanF*(qx*R[2]+qy*U[2]);
       const dl=Math.hypot(dx,dy,dz); dx/=dl;dy/=dl;dz/=dl;
+      _acc[0]=0;_acc[1]=0;_acc[2]=0;_trans=1;
       const code=lens?traceRay(C[0],C[1],C[2],dx,dy,dz,opt,_o2)
                      :traceNewton(C[0],C[1],C[2],dx,dy,dz,opt,_o2);
-      if(code===1)diskCol(_o2.Xx,_o2.Xy,_o2.r,_o2.g,cpuEng.frameT,opt,_px);
-      else if(code===0)skyCol(_o2.dx,_o2.dy,_o2.dz,pxAng,_px);
-      else{_px[0]=0;_px[1]=0;_px[2]=0;}
+      if(code===0){
+        skyCol(_o2.dx,_o2.dy,_o2.dz,pxAng,_px);
+        _acc[0]+=_trans*_px[0];_acc[1]+=_trans*_px[1];_acc[2]+=_trans*_px[2];
+      }
       const i4=(y*W+x)*4;
-      img[i4]=tonemap(_px[0])*255;img[i4+1]=tonemap(_px[1])*255;img[i4+2]=tonemap(_px[2])*255;img[i4+3]=255;
+      img[i4]=tonemap(_acc[0])*255;img[i4+1]=tonemap(_acc[1])*255;img[i4+2]=tonemap(_acc[2])*255;img[i4+3]=255;
     }
     cpuEng.row++;
     if(performance.now()-t0>budgetMs)break;
