@@ -36,6 +36,7 @@ Prefers a browser with WebGL2 (any modern Chrome, Firefox, Safari, or Edge). Wit
   - *Bend light* off = Newton's straight rays: a flat saucer with a dark ball in the middle.
   - *Doppler & beaming* off = the symmetric golden disk (the choice Interstellar's artists made on purpose).
   - *Time dilation* off = no gravitational or orbital redshift.
+- **Throw something in 🥄** — launches a small rigid object (a teapot, a grand piano, your homework…) onto a random plunging orbit and lets gravity do the rest: every fragment rides its own exact timelike geodesic, so the **spaghettification** you watch is pure geodesic deviation — nothing is stretched by hand. Debris is lensed, Doppler-beamed, occulted by the disk, and — because the simulation runs in your distant clock's coordinate time — it freezes and redshifts to black at the horizon instead of crossing it.
 - **Scenes**: *Edge-on furnace* (the classic lopsided portrait), *M87\* portrait* (the EHT geometry, 17° from the jet axis), *The Interstellar look* (lensing kept, beaming dropped — Hollywood's confession), *Naked lens* (no disk, just the star field smeared into arcs and an Einstein ring), *Newton's sky* (everything the real image has and this one lacks is general relativity).
 - **Compute engine** — the same rays, two arithmetics:
   - **GPU · float32** — every pixel in parallel in fragment shaders, tens of millions of geodesics per second.

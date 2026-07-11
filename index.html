@@ -20,6 +20,7 @@ html,body{height:100%}
 body{margin:0;background:var(--void);color:var(--ink);font-family:var(--sans);overflow:hidden}
 #gl,#cpu{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 #cpu{display:none;background:#000}
+#ov{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:1}
 #gl.dragging,#cpu.dragging{cursor:grabbing}
 
 .panel{position:fixed;background:var(--glass);border:1px solid var(--line);border-radius:10px;
@@ -53,9 +54,10 @@ body{margin:0;background:var(--void);color:var(--ink);font-family:var(--sans);ov
 input[type=range]{width:100%;accent-color:var(--gold);height:18px;margin:0}
 .hint{font-size:11px;line-height:1.5;color:var(--ink-faint);margin:6px 0 0}
 .presets{display:flex;gap:6px;flex-wrap:wrap}
-.presets button, .seg button, #reseed{font-size:11px;padding:5px 9px;border-radius:7px;border:1px solid var(--line);
+.presets button, .seg button, #reseed, #throwBtn{font-size:11px;padding:5px 9px;border-radius:7px;border:1px solid var(--line);
   background:rgba(233,238,247,.05);color:var(--ink-dim);cursor:pointer;font-family:var(--sans)}
-.presets button:hover,.seg button:hover,#reseed:hover{color:var(--ink);background:rgba(233,238,247,.12)}
+.presets button:hover,.seg button:hover,#reseed:hover,#throwBtn:hover{color:var(--ink);background:rgba(233,238,247,.12)}
+#throwBtn{width:100%;font-size:12px;padding:7px 9px;color:var(--gold);border-color:rgba(255,217,143,.35)}
 .presets button.on{background:rgba(255,217,143,.16);color:var(--gold);border-color:rgba(255,217,143,.4)}
 .seg{display:flex;gap:0;border:1px solid var(--line);border-radius:7px;overflow:hidden}
 .seg button{border:0;border-radius:0;flex:1}
@@ -102,6 +104,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
 <body>
 <canvas id="gl"></canvas>
 <canvas id="cpu"></canvas>
+<canvas id="ov"></canvas>
 
 <div id="leftcol">
 <div id="masthead" class="panel">
@@ -126,6 +129,10 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
     <p class="hint">The inner edge is not a slider: gas can’t orbit stably inside the ISCO at 3 r<sub>s</sub>.</p></div>
   <div class="ctl"><label>Disk temperature, peak <b id="tmaxVal"></b></label>
     <input id="tmax" type="range" min="2000" max="25000" value="7000"></div>
+
+  <p class="sect">Spaghettification</p>
+  <button id="throwBtn">Throw something in 🥄</button>
+  <p class="hint">A little rigid object on a random plunging orbit — then gravity alone: every fragment rides its own exact timelike geodesic, and the tide tears them apart. ×n is how many times longer it has grown. Near the horizon it freezes and redshifts to black, exactly as a distant camera sees.</p>
 
   <p class="sect">Relativity, à la carte</p>
   <div class="presets" id="fxBtns">
@@ -201,6 +208,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
   <div class="row"><span class="k">Frame</span><span class="v" id="rFrame">—</span></div>
   <div class="row"><span class="k">Geodesics per second</span><span class="v" id="rMray">—</span></div>
   <div class="row" id="progRow" style="display:none"><span class="k">CPU frame progress</span><span class="v" id="rProg">—</span></div>
+  <div class="row" id="debrisRow" style="display:none"><span class="k">Debris invariant drift</span><span class="v" id="rDebris">—</span></div>
 </aside>
 
 <details id="science" class="panel">
@@ -212,9 +220,12 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
     <p>The bright halo hugging the shadow is the <b>photon ring</b>: rays with impact parameter near b = 3√3⁄2&thinsp;r<sub>s</sub> ≈ 2.598&thinsp;r<sub>s</sub> circle the hole one or more times before escaping, so a thin annulus of sky carries an image of the entire disk, repeated. The disk’s far side doesn’t hide behind the hole: rays passing over the pole are bent down onto its top surface, so you see it <b>arched above the shadow</b> (and its underside mirrored below — the Interstellar look). And the two wings are unequal because the gas orbits at nearly half the speed of light at the inner edge: relativistic <b>Doppler beaming</b> brightens the approaching side by roughly g⁴, where g is the frequency shift. Toggle the effects off one at a time and the portrait falls apart into a Newtonian saucer.</p>
     <h3>3 · The disk</h3>
     <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest. The outer rim fades out gradually and raggedly rather than at a hard circle, and it goes <b>optically thin</b> as it fades — rays keep going through the last wisps, so the lensed sky (and the disk’s own far side) shines through. Real disks end in a taper, not a cliff, though the taper’s exact shape here is aesthetic, not derived.</p>
-    <h3>4 · Honest caveats</h3>
+    <h3>4 · Spaghettification, honestly</h3>
+    <p>“Throw something in” launches a small rigid object — and then lets go. From that instant each of its eleven fragments rides its <b>own exact timelike geodesic</b> (conserved E and L, radial equation r̈ = −M/r² + L²/r³ − 3ML²/r⁴), advanced in <b>coordinate time</b> — your distant clock. Nothing stretches the object by hand: the strand you watch is <b>geodesic deviation</b>. The near end falls harder than the far end (tidal stretch ≈ 2Mℓ/r³ along the radius) while the sides are squeezed inward — hence spaghetti. Because the simulation runs on your clock, the debris never crosses the horizon on screen: it slows, freezes, and <b>redshifts to black</b> just outside — exactly what a distant camera records. Each fragment’s image is found by <b>shooting</b>: bisecting the photon launch angle until the light geodesic lands on the fragment, so debris is lensed, Doppler-boosted and dimmed by g⁴, hidden behind the shadow, and occulted by the disk by the same physics as everything else. A scale note: tides at the horizon go as 1/M², so spaghettification is <i>fiercer for smaller black holes</i> — a 10 M☉ hole shreds a falling astronaut well outside the horizon, while at M87* you would cross it intact and unalarmed.</p>
+    <h3>5 · Honest caveats</h3>
     <p><b>No spin.</b> This is Schwarzschild; real black holes rotate. Kerr spacetime drags frames, shrinks the ISCO (as low as 0.5&thinsp;r<sub>s</sub> of gravitational radius for maximal spin), and makes the shadow slightly D-shaped — percent-level corrections to the ring, big corrections to the inner disk. <b>The disk is opaque and thin</b> (except its tapering rim, which is allowed to go optically thin); M87*’s real glow is synchrotron plasma, not a blackbody, and no polarization is computed here. <b>The camera hovers</b> — a static Schwarzschild observer, engines burning, not a free-falling one. The background sky is procedural, not a star catalog. And a confession from Hollywood: Interstellar’s Gargantua deliberately <i>omitted</i> Doppler beaming and blue/red shifts so the disk would look symmetric and golden on screen — the preset above reproduces that choice; flip “Doppler &amp; beaming” back on to see what Kip Thorne’s honest version looks like.</p>
     <p class="fn"><b>Numerical method:</b> per pixel, the ray’s plane is found from camera position and pixel direction (Schwarzschild orbits are planar), the Binet equation above is advanced by RK4 with dφ = 6π/steps, and disk crossings are detected by sign change of the plane-height and interpolated within the step. Escape is declared when the ray moves outward past r = max(2r<sub>cam</sub>, 400&thinsp;r<sub>s</sub>); its tangent there is the sky direction (the residual bending beyond that radius is ~2Mb/r² ≲ 10⁻⁵ rad). Rays that exhaust the step budget while winding are charged to the shadow — that is what the quality slider trades.</p>
+    <p class="fn"><b>Debris:</b> fragments are non-interacting test particles — no self-gravity, no material strength (honest for spaghettification: it is precisely the regime where gravity has already won). State (r, p<sub>r</sub> = dr/dτ, φ) per fragment in its own orbital plane, RK4 in coordinate time via dτ/dt = (1−r<sub>s</sub>/r)/E; the console reports the worst violation of E² − p<sub>r</sub>² − (1−r<sub>s</sub>/r)(1+L²/r²) = 0 across live fragments. Images: only the primary lensed image is drawn (no ghost images), at equal coordinate time (light-travel delay to the camera is ignored), with the exact shift g = √(1−r<sub>s</sub>/r) ⁄ [γ(1−<b>n</b>·<b>v</b>)√(1−r<sub>s</sub>/r<sub>cam</sub>)]. And the objects are absurdly r<sub>s</sub>-sized, so you can watch.</p>
     <p class="fn"><b>Two engines:</b> the GPU renders every pixel in parallel in float32 fragment shaders; the CPU engine renders the identical algorithm in float64, progressively, as the reference. The honesty panel quantifies both sins: integration error (render-grade vs 25,000-step reference ray) and arithmetic error (the same ray replayed with float32 rounding after every step).</p>
     <p class="fn"><b>Units:</b> G = c = 1, lengths in Schwarzschild radii (M = ½), time in r<sub>s</sub>/c. Blackbody colors via a standard Planckian-locus fit, ACES-style tone mapping. The mass buttons change no physics — only the physical ruler: r<sub>s</sub> in kilometres, the ISCO clock, and the ring’s angular size from Earth (52 μas for Sgr A*, ~40 μas for M87* — the sizes the Event Horizon Telescope photographed).</p>
   </div>
@@ -398,6 +409,18 @@ function skyCol(dx,dy,dz,pxAng,out){
     out[0]+=g1*0.72+band*0.012*0.9; out[1]+=g1*0.78+band*0.012*0.75; out[2]+=g1*0.95+band*0.012*0.6;
   }
 }
+function diskAlpha(px,py,r,rout){                        // opacity: ragged, turbulence-modulated rim
+  const rim=rout*(0.50+0.22*fbm(px*0.3,py*0.3,977));
+  let f=Math.min(1,Math.max(0,(r-rim)/(rout-rim)));
+  f=1-f*f*(3-2*f);
+  const sIn=Math.min(1,Math.max(0,(r-RIN)/(RIN*0.02)));
+  return sIn*sIn*(3-2*sIn)*f*f;
+}
+function diskAlphaWorld(Xx,Xy,r,t,rout){                 // same opacity, from world coords
+  const om=1/Math.sqrt(2*r*r*r);
+  const a2=Math.atan2(Xy,Xx)-om*t;
+  return diskAlpha(Math.cos(a2)*r*0.85,Math.sin(a2)*r*0.85,r,rout);
+}
 function diskCol(Xx,Xy,r,g,t,o,out){
   const om=1/Math.sqrt(2*r*r*r);
   const a2=Math.atan2(Xy,Xx)-om*t;
@@ -407,16 +430,368 @@ function diskCol(Xx,Xy,r,g,t,o,out){
   const Tem=o.tmax*Math.pow(r,-0.75)*Math.pow(Math.max(1-Math.sqrt(RIN/r),1e-4),0.25)/PMAX;
   const gg=Math.max(g,0);
   const I=Math.pow(gg*Tem/o.tmax,4)*pat*0.8;
-  const rim=o.rout*(0.50+0.22*fbm(px*0.3,py*0.3,977));   // ragged, turbulence-modulated outer rim
-  let f=Math.min(1,Math.max(0,(r-rim)/(o.rout-rim)));
-  f=1-f*f*(3-2*f);
-  let sIn=Math.min(1,Math.max(0,(r-RIN)/(RIN*0.02)));
-  const edge=sIn*sIn*(3-2*sIn)*f*f;
+  const edge=diskAlpha(px,py,r,o.rout);
   blackbody(gg*Tem,_bb);
   out[0]=_bb[0]*I*edge;out[1]=_bb[1]*I*edge;out[2]=_bb[2]*I*edge;
   return edge;                                // opacity, for compositing
 }
 function tonemap(x){const y=x*(2.51*x+0.03)/(x*(2.43*x+0.59)+0.14);return Math.pow(Math.min(1,Math.max(0,y)),0.4545);}
+
+/* ===================== thrown debris: timelike geodesics & spaghettification =====================
+   A thrown object is rigid only at launch; after that every fragment rides its own exact
+   timelike geodesic — state (r, pr = dr/dτ, φ) in the fragment's own orbital plane with
+   conserved E and L, RK4-advanced in COORDINATE time (dτ/dt = (1−1/r)/E), so infall freezes
+   and redshifts at the horizon exactly as a distant camera sees it. The stretching is never
+   imposed: it is geodesic deviation between fragments. Each fragment's image is found by
+   shooting — root-finding the photon launch angle until the Binet geodesic lands on the
+   fragment — so debris is lensed, beamed, disk-occulted and shadow-hidden like everything else. */
+const OBJECTS=[['a teapot 🫖',4800],['a comet ☄️',8500],['an asteroid 🪨',3600],
+  ['a grand piano 🎹',4400],['a rubber duck 🦆',5200],['a snowman ⛄',7000],
+  ['a school bus 🚌',4100],['a very small star ⭐',9500],['your homework 📚',5600],
+  ['a wheel of cheese 🧀',4000]];
+const AXN=7,PERPN=4,LEN0=0.62,PERPR=0.13,MAXOBJ=5;
+const debris=[];
+const ov=document.getElementById('ov'),ovCtx=ov.getContext('2d');
+let ovLive=false;
+function perpTo(a){const t=Math.abs(a[0])<0.7?[1,0,0]:[0,1,0];return norm3(cross3(a,t));}
+function newParticle(P,V,T){
+  const r=Math.hypot(P[0],P[1],P[2]);
+  const e1=[P[0]/r,P[1]/r,P[2]/r];
+  const vr=V[0]*e1[0]+V[1]*e1[1]+V[2]*e1[2];
+  const tv=[V[0]-vr*e1[0],V[1]-vr*e1[1],V[2]-vr*e1[2]];
+  const vt=Math.hypot(tv[0],tv[1],tv[2]);
+  const e2=vt>1e-9?[tv[0]/vt,tv[1]/vt,tv[2]/vt]:perpTo(e1);
+  const s=Math.sqrt(1-1/r);
+  const g=1/Math.sqrt(Math.max(1-vr*vr-vt*vt,1e-4));
+  return {e1,e2,r,phi:0,pr:g*s*vr,E:g*s,L:g*vt*r,T,
+          mode:'fall',fade:1,pz:undefined,dimN:0,dist:1,
+          th:-1,br:0,vis:false,trans:1,dir3:null,n3:null,
+          sx:0,sy:0,size:2,B:0,cr:0,cg:0,cb:0,onscreen:false};
+}
+function throwObject(){
+  if(debris.length>=MAXOBJ)debris.shift();
+  const kind=OBJECTS[Math.min(OBJECTS.length-1,Math.floor(rng()*OBJECTS.length))];
+  const {C,U}=camBasis();
+  const rc=Math.hypot(C[0],C[1],C[2]);
+  const r0=Math.min(22,Math.max(7,rc*0.55));   // well inside the field of view
+  const up=0.05+0.15*rng();               // slight bias above the line of sight, clear of the disk glare
+  const sd=norm3([C[0]/rc+U[0]*up+(rng()-0.5)*0.3,C[1]/rc+U[1]*up+(rng()-0.5)*0.3,C[2]/rc+U[2]*up+(rng()-0.5)*0.3]);
+  const P0=[sd[0]*r0,sd[1]*r0,sd[2]*r0];
+  const v0=0.28+0.24*rng();
+  const gm=1/Math.sqrt(1-v0*v0);
+  const Lt=0.25+2.15*rng();               // below ~2: plunge; near the top: near-miss slingshots
+  const sinA=Math.min(0.9,Lt/(gm*v0*r0)), cosA=Math.sqrt(1-sinA*sinA);
+  const tv=perpToRnd(sd);
+  const V=[v0*(-sd[0]*cosA+tv[0]*sinA),v0*(-sd[1]*cosA+tv[1]*sinA),v0*(-sd[2]*cosA+tv[2]*sinA)];
+  const ax=norm3([rng()-0.5,rng()-0.5,rng()-0.5]);
+  const q1=perpTo(ax),q2=cross3(ax,q1);
+  const parts=[];
+  for(let i=0;i<AXN;i++){
+    const o=(i/(AXN-1)-0.5)*LEN0;
+    parts.push(newParticle([P0[0]+ax[0]*o,P0[1]+ax[1]*o,P0[2]+ax[2]*o],V,kind[1]));
+  }
+  for(let i=0;i<PERPN;i++){
+    const a=i/PERPN*TAU,co=Math.cos(a)*PERPR,si=Math.sin(a)*PERPR;
+    parts.push(newParticle([P0[0]+q1[0]*co+q2[0]*si,P0[1]+q1[1]*co+q2[1]*si,P0[2]+q1[2]*co+q2[2]*si],V,kind[1]));
+  }
+  debris.push({name:kind[0],parts});
+}
+function perpToRnd(a){
+  const t=[rng()-0.5,rng()-0.5,rng()-0.5];
+  const c=cross3(a,t),l=Math.hypot(c[0],c[1],c[2]);
+  return l<1e-6?perpTo(a):[c[0]/l,c[1]/l,c[2]/l];
+}
+/* RK4 on (r, pr, φ) in coordinate time; r̈(τ) = −M/r² + L²/r³ − 3ML²/r⁴ with M = ½.
+   Below r = 1.015 the state is frozen outright: dτ/dt → 0 there, the fragment is already
+   redshifted invisible, and integrating a pinned r would corrupt pr and the invariant. */
+function stepParticle(p,ht){
+  if(p.r<=1.015)return;
+  const E=p.E,L=p.L,L2=L*L;
+  const r=p.r,pr=p.pr;
+  const f1=(1-1/r)/E;
+  const a1r=pr*f1, a1p=(-0.5/(r*r)+L2/(r*r*r)-1.5*L2/(r*r*r*r))*f1, a1f=L/(r*r)*f1;
+  let rr=r+0.5*ht*a1r, pp=pr+0.5*ht*a1p, f=(1-1/rr)/E;
+  const a2r=pp*f, a2p=(-0.5/(rr*rr)+L2/(rr*rr*rr)-1.5*L2/(rr*rr*rr*rr))*f, a2f=L/(rr*rr)*f;
+  rr=r+0.5*ht*a2r; pp=pr+0.5*ht*a2p; f=(1-1/rr)/E;
+  const a3r=pp*f, a3p=(-0.5/(rr*rr)+L2/(rr*rr*rr)-1.5*L2/(rr*rr*rr*rr))*f, a3f=L/(rr*rr)*f;
+  rr=r+ht*a3r; pp=pr+ht*a3p; f=(1-1/rr)/E;
+  const a4r=pp*f, a4p=(-0.5/(rr*rr)+L2/(rr*rr*rr)-1.5*L2/(rr*rr*rr*rr))*f, a4f=L/(rr*rr)*f;
+  p.r=r+ht*(a1r+2*(a2r+a3r)+a4r)/6;
+  p.pr=pr+ht*(a1p+2*(a2p+a3p)+a4p)/6;
+  p.phi+=ht*(a1f+2*(a2f+a3f)+a4f)/6;
+  if(p.r<1.012)p.r=1.012;
+}
+const _P=[0,0,0];
+/* proper length of the strand on the static slice, dl² = dr²/(1−1/r) + r²dΩ² —
+   coordinate Δr collapses at the horizon while the true stretched length diverges */
+const _SA=[0,0,0],_SB=[0,0,0];
+function strandStretch(ob){
+  let s=0;
+  for(let i=0;i+1<AXN;i++){
+    const a=ob.parts[i],b=ob.parts[i+1];
+    partPos(a,_SA);partPos(b,_SB);
+    const rm=0.5*(a.r+b.r);
+    const ca=(_SA[0]*_SB[0]+_SA[1]*_SB[1]+_SA[2]*_SB[2])/(a.r*b.r);
+    const ang=Math.acos(Math.min(1,Math.max(-1,ca)));
+    const dr=b.r-a.r;
+    s+=Math.sqrt(dr*dr/Math.max(1-1/rm,1e-3)+rm*rm*ang*ang);
+  }
+  return s/LEN0;
+}
+function partPos(p,out){
+  const cs=Math.cos(p.phi),sn=Math.sin(p.phi);
+  out[0]=(cs*p.e1[0]+sn*p.e2[0])*p.r;
+  out[1]=(cs*p.e1[1]+sn*p.e2[1])*p.r;
+  out[2]=(cs*p.e1[2]+sn*p.e2[2])*p.r;
+}
+function updateDebris(dtSim){
+  if(dtSim>0){
+    const nsub=Math.min(90,Math.max(1,Math.ceil(dtSim/0.15)));
+    const ht=dtSim/nsub;
+    for(const ob of debris)for(const p of ob.parts){
+      if(p.mode!=='fall')continue;
+      for(let i=0;i<nsub;i++)stepParticle(p,ht);
+      partPos(p,_P);
+      if(params.disk>0&&p.pz!==undefined&&p.pz*_P[2]<0){   // crossed the disk plane: splat?
+        const rcy=Math.hypot(_P[0],_P[1]);
+        if(rcy>=RIN&&rcy<=params.rout&&diskAlphaWorld(_P[0],_P[1],rcy,simT,params.rout)>0.5)p.mode='splat';
+      }
+      p.pz=_P[2];
+      if(p.r>380)p.mode='gone';
+    }
+  }
+  for(const ob of debris)for(const p of ob.parts)if(p.mode==='splat'){p.fade-=0.025;if(p.fade<=0)p.mode='gone';}
+  for(let i=debris.length-1;i>=0;i--)if(debris[i].parts.every(p=>p.mode==='gone'))debris.splice(i,1);
+}
+/* --- image shooting: find the photon launch angle θ whose geodesic lands on the fragment --- */
+const MAXDC=6;
+function mkres(){return{n:0,nd:0,cap:false,p0:0,w0:0,p1:0,w1:0,dphi_:new Float64Array(MAXDC),du_:new Float64Array(MAXDC)};}
+const _sA=mkres(),_sB=mkres();
+function shootPhoton(rc,theta,uTar,e1z,e2z,wantDC,res){
+  const st=Math.sin(theta),ct=Math.cos(theta);
+  const u0=1/rc;
+  const b=rc*st/Math.sqrt(1-1/rc);
+  let u=u0,w=Math.sqrt(Math.max(1/(b*b)-u0*u0*(1-u0),0))*(ct<0?1:-1);
+  const h=0.006;
+  let phi=0,up=u,wp=w,Ap=e1z;
+  res.n=0;res.nd=0;res.cap=false;
+  for(let i=0;i<2600;i++){
+    let k1u=w,k1w=1.5*u*u-u;
+    let au=u+0.5*h*k1u,aw=w+0.5*h*k1w;
+    let k2u=aw,k2w=1.5*au*au-au;
+    au=u+0.5*h*k2u;aw=w+0.5*h*k2w;
+    let k3u=aw,k3w=1.5*au*au-au;
+    au=u+h*k3u;aw=w+h*k3w;
+    let k4u=aw,k4w=1.5*au*au-au;
+    u+=h*(k1u+2*(k2u+k3u)+k4u)/6;
+    w+=h*(k1w+2*(k2w+k3w)+k4w)/6;
+    phi+=h;
+    if(u>=1){res.cap=true;break;}
+    if(wantDC){
+      const A=Math.cos(phi)*e1z+Math.sin(phi)*e2z;
+      if(A*Ap<0&&res.nd<MAXDC){
+        const fr=Ap/(Ap-A);
+        res.dphi_[res.nd]=phi-h*(1-fr);res.du_[res.nd]=up+fr*(u-up);res.nd++;
+      }
+      Ap=A;
+    }
+    if(phi>h&&(u-uTar)*(up-uTar)<=0){       // crossed the fragment's radius
+      const fr=(uTar-up)/((u-up)||1e-30);
+      if(res.n===0){res.p0=phi-h*(1-fr);res.w0=wp+fr*(w-wp);}
+      else{res.p1=phi-h*(1-fr);res.w1=wp+fr*(w-wp);}
+      res.n++;
+      if(res.n===2)break;
+    }
+    up=u;wp=w;
+    if(w<0&&u<0.0024)break;                 // escaped past r ≈ 420
+  }
+  return res;
+}
+function missTheta(rc,uT,dphi,br,th){
+  shootPhoton(rc,th,uT,0,0,false,_sB);
+  if(_sB.n<=br)return NaN;
+  return (br===0?_sB.p0:_sB.p1)-dphi;
+}
+function polishTheta(rc,uT,dphi,br,th0){    // warm start: secant from last frame's θ
+  let a=th0,Ra=missTheta(rc,uT,dphi,br,a);
+  if(!isFinite(Ra))return -1;
+  for(let i=0;i<9;i++){
+    if(Math.abs(Ra)<2e-4)return a;
+    const d=1e-4,Rb=missTheta(rc,uT,dphi,br,a+d);
+    if(!isFinite(Rb))return -1;
+    const sl=(Rb-Ra)/d;
+    if(Math.abs(sl)<1e-8)return -1;
+    const an=a-Ra/sl;
+    if(!(an>0.03&&an<Math.PI-0.03)||Math.abs(an-a)>0.35)return -1;
+    a=an;Ra=missTheta(rc,uT,dphi,br,a);
+  }
+  return Math.abs(Ra)<3e-3?a:-1;
+}
+let rescanBudget=6;
+function gridTheta(rc,uT,dphi){             // cold start: bracket a sign change per branch, bisect
+  const N=44;let pR0=NaN,pR1=NaN,pth=0,second=null;
+  for(let i=0;i<=N;i++){
+    const th=0.03+(Math.PI-0.06)*i/N;
+    shootPhoton(rc,th,uT,0,0,false,_sB);
+    const R0=_sB.n>0?_sB.p0-dphi:NaN;
+    const R1=_sB.n>1?_sB.p1-dphi:NaN;
+    if(isFinite(R0)&&isFinite(pR0)&&R0*pR0<=0){const t=bisectTheta(rc,uT,dphi,0,pth,th);if(t>0)return[t,0];}
+    if(!second&&isFinite(R1)&&isFinite(pR1)&&R1*pR1<=0){const t=bisectTheta(rc,uT,dphi,1,pth,th);if(t>0)second=[t,1];}
+    pR0=R0;pR1=R1;pth=th;
+  }
+  return second;                            // far-side (outbound) image if no near one exists
+}
+function bisectTheta(rc,uT,dphi,br,a,b){
+  let Ra=missTheta(rc,uT,dphi,br,a);
+  if(!isFinite(Ra))return -1;
+  for(let i=0;i<42;i++){
+    const m=(a+b)/2,Rm=missTheta(rc,uT,dphi,br,m);
+    if(!isFinite(Rm)){b=m;continue;}
+    if(Math.abs(Rm)<2e-4)return m;
+    if(Ra*Rm<=0)b=m;else{a=m;Ra=Rm;}
+  }
+  return -1;
+}
+function solveImage(p,C,rc){
+  partPos(p,_P);
+  const rp=Math.hypot(_P[0],_P[1],_P[2]);
+  const e1=[C[0]/rc,C[1]/rc,C[2]/rc];
+  const pd=_P[0]*e1[0]+_P[1]*e1[1]+_P[2]*e1[2];
+  const ex=[_P[0]-pd*e1[0],_P[1]-pd*e1[1],_P[2]-pd*e1[2]];
+  const el=Math.hypot(ex[0],ex[1],ex[2]);
+  const e2=el>1e-9?[ex[0]/el,ex[1]/el,ex[2]/el]:perpTo(e1);
+  const dphi=Math.atan2(el,pd);
+  const uT=1/rp;
+  p.dist=Math.hypot(_P[0]-C[0],_P[1]-C[1],_P[2]-C[2]);
+  if(!(params.lens>0)){                     // Newton mode: straight-line image
+    const dl=p.dist;
+    const d=[(_P[0]-C[0])/dl,(_P[1]-C[1])/dl,(_P[2]-C[2])/dl];
+    const tb=-(C[0]*d[0]+C[1]*d[1]+C[2]*d[2]), d2=rc*rc-tb*tb;
+    if(d2<1&&tb>0&&tb-Math.sqrt(1-d2)<dl){p.vis=false;return;}   // behind the dark ball
+    let trans=1;
+    if(params.disk>0&&Math.abs(d[2])>1e-12){
+      const tz=-C[2]/d[2];
+      if(tz>0&&tz<dl-0.01){
+        const Xx=C[0]+tz*d[0],Xy=C[1]+tz*d[1],rx=Math.hypot(Xx,Xy);
+        if(rx>=RIN&&rx<=params.rout)trans*=1-diskAlphaWorld(Xx,Xy,rx,simT,params.rout);
+      }
+    }
+    p.dir3=d;p.n3=[-d[0],-d[1],-d[2]];p.trans=trans;p.vis=true;return;
+  }
+  let th=-1,br=p.br;
+  if(p.th>0)th=polishTheta(rc,uT,dphi,p.br,p.th);
+  if(th<0&&rescanBudget>0){
+    rescanBudget--;
+    const g=gridTheta(rc,uT,dphi);
+    if(g){th=g[0];br=g[1];}
+  }
+  if(th<0){p.vis=false;return;}
+  p.th=th;p.br=br;
+  shootPhoton(rc,th,uT,e1[2],e2[2],params.disk>0,_sA);           // final run: occultation + tangent
+  if(_sA.n<=br){p.vis=false;return;}
+  const phx=br===0?_sA.p0:_sA.p1, wx=br===0?_sA.w0:_sA.w1;
+  let trans=1;
+  for(let k=0;k<_sA.nd;k++){
+    if(_sA.dphi_[k]>=phx-0.004)break;       // only disk crossings in front of the fragment
+    const rx=1/_sA.du_[k];
+    if(rx>=RIN&&rx<=params.rout){
+      const cs=Math.cos(_sA.dphi_[k]),sn=Math.sin(_sA.dphi_[k]);
+      trans*=1-diskAlphaWorld((cs*e1[0]+sn*e2[0])*rx,(cs*e1[1]+sn*e2[1])*rx,rx,simT,params.rout);
+    }
+  }
+  p.trans=trans;
+  const c0=Math.cos(th),s0=Math.sin(th);
+  p.dir3=[c0*e1[0]+s0*e2[0],c0*e1[1]+s0*e2[1],c0*e1[2]+s0*e2[2]];
+  const cs=Math.cos(phx),sn=Math.sin(phx);
+  let tx=-sn*uT-cs*wx,ty=cs*uT-sn*wx;
+  const tl=Math.hypot(tx,ty)||1;tx/=tl;ty/=tl;
+  p.n3=[-(tx*e1[0]+ty*e2[0]),-(tx*e1[1]+ty*e2[1]),-(tx*e1[2]+ty*e2[2])];   // emitter → camera
+  p.vis=true;
+}
+/* exact shift for a moving emitter seen by the static camera:
+   g = √(1−1/r) / [γ(1−n·v)√(1−1/r_cam)], v in the local static frame */
+function gFactor(p,rc){
+  const s=Math.sqrt(1-1/p.r);
+  const cs=Math.cos(p.phi),sn=Math.sin(p.phi);
+  const vr=p.pr/p.E, vph=p.L*s/(p.r*p.E);
+  const n=p.n3;
+  const ndv=vr*((cs*p.e1[0]+sn*p.e2[0])*n[0]+(cs*p.e1[1]+sn*p.e2[1])*n[1]+(cs*p.e1[2]+sn*p.e2[2])*n[2])
+           +vph*((-sn*p.e1[0]+cs*p.e2[0])*n[0]+(-sn*p.e1[1]+cs*p.e2[1])*n[1]+(-sn*p.e1[2]+cs*p.e2[2])*n[2]);
+  const gam=p.E/s;
+  const gA=params.grav>0?s/(Math.sqrt(1-1/rc)*gam):1;
+  const gB=params.dopp>0?1/Math.max(1e-3,1-ndv):1;
+  return gA*gB;
+}
+const _bb2=[0,0,0];
+function drawDebris(){
+  const W=ov.width,H=ov.height;
+  ovCtx.clearRect(0,0,W,H);
+  if(!debris.length)return;
+  const {C,F,R,U}=camBasis();
+  const rc=Math.hypot(C[0],C[1],C[2]);
+  const tanF=Math.tan(params.fov*RAD/2);
+  rescanBudget=6;
+  ovCtx.globalCompositeOperation='lighter';
+  ovCtx.lineCap='round';
+  for(const ob of debris){
+    for(const p of ob.parts){
+      p.onscreen=false;
+      if(p.mode==='gone')continue;
+      solveImage(p,C,rc);
+      if(!p.vis)continue;
+      const d=p.dir3;
+      const df=d[0]*F[0]+d[1]*F[1]+d[2]*F[2];
+      if(df<0.02)continue;
+      const sx=W/2+(d[0]*R[0]+d[1]*R[1]+d[2]*R[2])/df*(H*0.5)/tanF;
+      const sy=H/2-(d[0]*U[0]+d[1]*U[1]+d[2]*U[2])/df*(H*0.5)/tanF;
+      if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
+      const g=gFactor(p,rc);
+      let B=Math.min(24,Math.pow(Math.max(g,0),4))*p.trans;
+      if(p.mode==='splat')B*=p.fade*2.5;
+      if(B<2e-3){p.dimN++;if(p.dimN>240&&p.r<1.6)p.mode='gone';continue;}
+      p.dimN=0;
+      blackbody(Math.min(30000,Math.max(1200,g*p.T)),_bb2);
+      const m=Math.min(1.5,B);
+      p.cr=Math.round(255*tonemap(_bb2[0]*m));p.cg=Math.round(255*tonemap(_bb2[1]*m));p.cb=Math.round(255*tonemap(_bb2[2]*m));
+      p.sx=sx;p.sy=sy;p.B=B;
+      p.size=Math.max(1.4,Math.min(12,0.11/Math.max(p.dist,1)*(H*0.5)/tanF));
+      if(p.mode==='splat')p.size*=1+3*(1-p.fade);
+      p.onscreen=true;
+    }
+    for(let i=0;i+1<AXN;i++){               // the spaghetti strand, through the axis fragments
+      const a=ob.parts[i],b=ob.parts[i+1];
+      if(!a.onscreen||!b.onscreen)continue;
+      const al=Math.min(0.8,(a.B+b.B)*0.5);
+      ovCtx.strokeStyle='rgba('+((a.cr+b.cr)>>1)+','+((a.cg+b.cg)>>1)+','+((a.cb+b.cb)>>1)+','+al.toFixed(3)+')';
+      ovCtx.lineWidth=Math.max(1,(a.size+b.size)*0.5);
+      ovCtx.beginPath();ovCtx.moveTo(a.sx,a.sy);ovCtx.lineTo(b.sx,b.sy);ovCtx.stroke();
+    }
+    for(const p of ob.parts){
+      if(!p.onscreen)continue;
+      const al=Math.min(1,p.B);
+      const gr=ovCtx.createRadialGradient(p.sx,p.sy,0,p.sx,p.sy,p.size*2.2);
+      gr.addColorStop(0,'rgba('+p.cr+','+p.cg+','+p.cb+','+al.toFixed(3)+')');
+      gr.addColorStop(1,'rgba(0,0,0,0)');
+      ovCtx.fillStyle=gr;
+      ovCtx.beginPath();ovCtx.arc(p.sx,p.sy,p.size*2.2,0,TAU);ovCtx.fill();
+    }
+    const h0=ob.parts[0];
+    if(h0.onscreen&&h0.mode==='fall'){
+      const st=strandStretch(ob);
+      ovCtx.globalCompositeOperation='source-over';
+      ovCtx.font=Math.max(10,Math.round(H/72))+'px system-ui,sans-serif';
+      ovCtx.fillStyle='rgba(147,160,184,0.85)';
+      ovCtx.fillText(ob.name+' ×'+st.toFixed(1),h0.sx+10,h0.sy-8);
+      ovCtx.globalCompositeOperation='lighter';
+    }
+  }
+  ovCtx.globalCompositeOperation='source-over';
+}
+function resizeOv(){
+  const dpr=Math.min(2,devicePixelRatio||1);
+  ov.width=Math.max(64,Math.round(ov.clientWidth*dpr));
+  ov.height=Math.max(48,Math.round(ov.clientHeight*dpr));
+}
 
 /* ===================== honesty tests (CPU, float64 reference) ===================== */
 const _out={};
@@ -730,6 +1105,7 @@ function cpuChunk(budgetMs){
 const $=id=>document.getElementById(id);
 const el={rRing:$('rRing'),vRing:$('vRing'),rWeak:$('rWeak'),vWeak:$('vWeak'),rGrade:$('rGrade'),vGrade:$('vGrade'),
   rF32:$('rF32'),rFps:$('rFps'),rEng:$('rEng'),rFrame:$('rFrame'),rMray:$('rMray'),rProg:$('rProg'),progRow:$('progRow'),
+  rDebris:$('rDebris'),debrisRow:$('debrisRow'),
   rRs:$('rRs'),rIsco:$('rIsco'),rAng:$('rAng'),massHint:$('massHint'),clock:$('clock'),speedVal:$('speedVal'),
   presetHint:$('presetHint'),banner:$('banner')};
 function setPill(p,cls,txt){p.className='pill '+cls;p.textContent=txt;}
@@ -797,6 +1173,7 @@ function setMode(m){
 }
 
 $('reseed').addEventListener('click',()=>{skySeed=(rng()*4294967296)>>>0;viewChanged();});
+$('throwBtn').addEventListener('click',throwObject);
 
 const playBtn=$('playBtn'),speedSl=$('speed');
 playBtn.addEventListener('click',()=>{playing=!playing;playBtn.textContent=playing?'❚❚':'▶';});
@@ -841,7 +1218,7 @@ function resizeGL(){
   if(glCanvas.width!==W)glCanvas.width=W;
   if(glCanvas.height!==H)glCanvas.height=H;
 }
-addEventListener('resize',()=>{resizeGL();if(params.mode==='cpu')cpuStart();});
+addEventListener('resize',()=>{resizeGL();resizeOv();if(params.mode==='cpu')cpuStart();});
 
 function renderGL(){
   const {C,F,R,U}=camBasis();
@@ -879,6 +1256,8 @@ function frame(now){
     if(cpuEng.done&&playing){cpuStart();}      // next honest frame
     if(!cpuEng.done)cpuChunk(14);
   }
+  if(debris.length){updateDebris(playing?dt*params.speed:0);drawDebris();ovLive=true;}
+  else if(ovLive){ovCtx.clearRect(0,0,ov.width,ov.height);ovLive=false;}
   fpsAcc+=dt;fpsN++;
   if(now-lastUI>500){
     fpsShown=fpsN/Math.max(fpsAcc,1e-3);fpsAcc=0;fpsN=0;lastUI=now;
@@ -889,6 +1268,15 @@ function frame(now){
       ? ((W*H*fpsShown)/1e6).toFixed(1)+' M/s'
       : ((cpuEng.W*cpuEng.H*(cpuEng.done?1:cpuEng.row/Math.max(1,cpuEng.H))/1)/1e3).toFixed(0)+' k/frame';
     if(params.mode==='cpu')el.rProg.textContent=cpuEng.done?'done':Math.round(100*cpuEng.row/cpuEng.H)+'%';
+    if(debris.length){
+      el.debrisRow.style.display='flex';
+      let md=0;
+      for(const ob of debris)for(const p of ob.parts)if(p.mode==='fall'){
+        const q=Math.abs(p.E*p.E-p.pr*p.pr-(1-1/p.r)*(1+p.L*p.L/(p.r*p.r)));
+        if(q>md)md=q;
+      }
+      el.rDebris.textContent=md>0?expFmt(md):'0';
+    }else el.debrisRow.style.display='none';
     const m=MASSES[params.mass];
     el.clock.textContent='t = '+Math.round(simT)+' rs/c ≙ '+fmtTime(simT*S_PER_MSUN*m.M);
   }
@@ -904,6 +1292,8 @@ if(!gpuOK){
 }else{
   setMode('gpu');
 }
+resizeOv();
+if(location.hash.indexOf('throw')>=0)setTimeout(throwObject,400);
 setTimeout(runHonesty,200);
 requestAnimationFrame(frame);
 </script>
