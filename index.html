@@ -151,7 +151,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
     <input id="steps" type="range" min="200" max="2400" value="900">
     <p class="hint">More steps let near-critical rays wind further around the photon sphere before we give up.</p></div>
   <div class="ctl"><label>Resolution scale <b id="resVal"></b></label>
-    <input id="res" type="range" min="35" max="100" value="60"></div>
+    <input id="res" type="range" min="35" max="100" value="100"></div>
 
   <p class="sect">Compute engine</p>
   <div class="seg" id="engSeg">
@@ -241,7 +241,7 @@ const KPC_KM=3.0857e16;
 const mobile=innerWidth<700;
 const params={ inc:82, dist:27, fov:55, rout:14, tmax:7000,
   disk:1, lens:1, dopp:1, grav:1,
-  steps:mobile?500:900, res:mobile?0.5:0.6, mode:'gpu', mass:1, speed:15 };
+  steps:mobile?500:900, res:mobile?0.5:1, mode:'gpu', mass:1, speed:15 };
 const PRESETS={
   furnace:{inc:82,dist:27,fov:55,rout:14,tmax:5800,disk:1,lens:1,dopp:1,grav:1,mass:1,
     hint:'Nearly edge-on, everything switched on. The classic lopsided portrait: far side arched over the shadow, approaching wing beamed bright.'},
