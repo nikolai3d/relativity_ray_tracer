@@ -449,8 +449,9 @@ const OBJECTS=[['a teapot 🫖',4800],['a comet ☄️',8500],['an asteroid 🪨
   ['a grand piano 🎹',4400],['a rubber duck 🦆',5200],['a snowman ⛄',7000],
   ['a school bus 🚌',4100],['a very small star ⭐',9500],['your homework 📚',5600],
   ['a wheel of cheese 🧀',4000]];
-const AXN=7,PERPN=4,LEN0=1.6,PERPR=0.3,MAXOBJ=5;
+const AXN=7,PERPN=4,LEN0=3.2,PERPR=0.5,MAXOBJ=5;
 const debris=[];
+let thrownCount=0;
 const ov=document.getElementById('ov'),ovCtx=ov.getContext('2d');
 let ovLive=false;
 function perpTo(a){const t=Math.abs(a[0])<0.7?[1,0,0]:[0,1,0];return norm3(cross3(a,t));}
@@ -471,21 +472,37 @@ function newParticle(P,V,T){
 function throwObject(){
   if(debris.length>=MAXOBJ)debris.shift();
   const kind=OBJECTS[Math.min(OBJECTS.length-1,Math.floor(rng()*OBJECTS.length))];
-  const {C,U}=camBasis();
+  const {C,R,U}=camBasis();
   const rc=Math.hypot(C[0],C[1],C[2]);
-  const r0=Math.min(22,Math.max(7,rc*0.55));   // well inside the field of view
-  const up=0.05+0.15*rng();               // slight bias above the line of sight, clear of the disk glare
-  const sd=norm3([C[0]/rc+U[0]*up+(rng()-0.5)*0.3,C[1]/rc+U[1]*up+(rng()-0.5)*0.3,C[2]/rc+U[2]*up+(rng()-0.5)*0.3]);
+  // spawn to the SIDE of the shadow so the plunge crosses the field of view: a fall straight
+  // away from the camera stretches along the line of sight, which projects to nothing on screen
+  const r0=Math.min(12,Math.max(6,rc*0.35));
+  const beta=(0.55+0.4*rng())*(rng()<0.5?1:-1);  // 30–55° off the view axis: transverse, clear of the side panels
+  const up=0.20+0.20*rng();
+  const cb=Math.cos(beta),sb=Math.sin(beta);
+  const sd=norm3([C[0]/rc*cb+R[0]*sb+U[0]*up,C[1]/rc*cb+R[1]*sb+U[1]*up,C[2]/rc*cb+R[2]*sb+U[2]*up]);
   const P0=[sd[0]*r0,sd[1]*r0,sd[2]*r0];
   const v0=0.28+0.24*rng();
   const gm=1/Math.sqrt(1-v0*v0);
-  // mostly steep plunges (small L crosses the disk plane inside the ISCO gap, in full view);
-  // 1 in 5 gets near-critical L for a winding near-miss or slingshot
-  const Lt=rng()<0.8?0.3+1.4*rng():1.85+0.55*rng();
+  // mostly near-critical winding plunges: they whirl at r ≈ 2–4 where the shear between
+  // fragments smears the strand into an arc around the shadow — the visible spaghetti;
+  // some steep dives and escaping slingshots for variety
+  const u=rng();
+  // the first throw of a session gets the showpiece orbit: a near-critical whirl
+  const Lt=(thrownCount++===0)?1.9:(u<0.15?0.4+0.8*rng():(u<0.9?1.7+0.3*rng():2.05+0.35*rng()));
   const sinA=Math.min(0.9,Lt/(gm*v0*r0)), cosA=Math.sqrt(1-sinA*sinA);
-  const tv=perpToRnd(sd);
+  // whirl in a near-VERTICAL orbital plane (containing the polar axis): the angular sweep
+  // φ̇ = L/r² concentrates near periapsis, so the equator crossing happens inside the ISCO
+  // gap — the object whirls and shreds in full view instead of splatting on the disk face
+  const hz=norm3(cross3([0,0,1],sd));
+  const tvv=norm3(cross3(sd,hz));            // z-component always positive: the whirl CLIMBS first,
+  const tmx=0.35*(rng()-0.5);                // so the equator crossing lands ~half a turn in, deep in the gap
+  const tv=norm3([tvv[0]+tmx*hz[0],tvv[1]+tmx*hz[1],tvv[2]+tmx*hz[2]]);
   const V=[v0*(-sd[0]*cosA+tv[0]*sinA),v0*(-sd[1]*cosA+tv[1]*sinA),v0*(-sd[2]*cosA+tv[2]*sinA)];
-  const ax=norm3([rng()-0.5,rng()-0.5,rng()-0.5]);
+  // launch tidally aligned (axis along the radius, small tilt): the tide stretches radially and
+  // squeezes transversally, so a radial axis stretches monotonically from the start — a random
+  // one first tumbles and compresses, which reads as nothing happening
+  const ax=norm3([sd[0]+0.3*(rng()-0.5),sd[1]+0.3*(rng()-0.5),sd[2]+0.3*(rng()-0.5)]);
   const q1=perpTo(ax),q2=cross3(ax,q1);
   const parts=[];
   for(let i=0;i<AXN;i++){
@@ -496,7 +513,7 @@ function throwObject(){
     const a=i/PERPN*TAU,co=Math.cos(a)*PERPR,si=Math.sin(a)*PERPR;
     parts.push(newParticle([P0[0]+q1[0]*co+q2[0]*si,P0[1]+q1[1]*co+q2[1]*si,P0[2]+q1[2]*co+q2[2]*si],V,kind[1]));
   }
-  debris.push({name:kind[0],parts});
+  debris.push({name:kind[0],parts,stMax:1});
   if(params.speed>5){                     // ease the clock so the fall is watchable; slider stays yours
     params.speed=5;
     speedSl.value=Math.round(1000*Math.log10(params.speed/0.5)/3);
@@ -615,23 +632,28 @@ function shootPhoton(rc,theta,uTar,e1z,e2z,wantDC,res){
   }
   return res;
 }
+const RBIG=1e9;                             // "photon never reached that radius": +∞ for bracketing —
+                                            // the image can hide in the sliver against the tangency
+                                            // boundary where the crossing appears, so the boundary
+                                            // itself must form a valid bracket
 function missTheta(rc,uT,dphi,br,th){
   shootPhoton(rc,th,uT,0,0,false,_sB);
-  if(_sB.n<=br)return NaN;
+  if(_sB.n<=br)return RBIG;
   return (br===0?_sB.p0:_sB.p1)-dphi;
 }
 function polishTheta(rc,uT,dphi,br,th0){    // warm start: secant from last frame's θ
   let a=th0,Ra=missTheta(rc,uT,dphi,br,a);
-  if(!isFinite(Ra))return -1;
+  if(Ra>=RBIG)return -1;
   for(let i=0;i<9;i++){
     if(Math.abs(Ra)<2e-4)return a;
     const d=1e-4,Rb=missTheta(rc,uT,dphi,br,a+d);
-    if(!isFinite(Rb))return -1;
+    if(Rb>=RBIG)return -1;
     const sl=(Rb-Ra)/d;
     if(Math.abs(sl)<1e-8)return -1;
     const an=a-Ra/sl;
     if(!(an>0.03&&an<Math.PI-0.03)||Math.abs(an-a)>0.35)return -1;
     a=an;Ra=missTheta(rc,uT,dphi,br,a);
+    if(Ra>=RBIG)return -1;
   }
   return Math.abs(Ra)<3e-3?a:-1;
 }
@@ -641,20 +663,18 @@ function gridTheta(rc,uT,dphi){             // cold start: bracket a sign change
   for(let i=0;i<=N;i++){
     const th=0.03+(Math.PI-0.06)*i/N;
     shootPhoton(rc,th,uT,0,0,false,_sB);
-    const R0=_sB.n>0?_sB.p0-dphi:NaN;
-    const R1=_sB.n>1?_sB.p1-dphi:NaN;
-    if(isFinite(R0)&&isFinite(pR0)&&R0*pR0<=0){const t=bisectTheta(rc,uT,dphi,0,pth,th);if(t>0)return[t,0];}
-    if(!second&&isFinite(R1)&&isFinite(pR1)&&R1*pR1<=0){const t=bisectTheta(rc,uT,dphi,1,pth,th);if(t>0)second=[t,1];}
+    const R0=_sB.n>0?_sB.p0-dphi:RBIG;
+    const R1=_sB.n>1?_sB.p1-dphi:RBIG;
+    if(R0*pR0<=0){const t=bisectTheta(rc,uT,dphi,0,pth,th);if(t>0)return[t,0];}
+    if(!second&&R1*pR1<=0){const t=bisectTheta(rc,uT,dphi,1,pth,th);if(t>0)second=[t,1];}
     pR0=R0;pR1=R1;pth=th;
   }
   return second;                            // far-side (outbound) image if no near one exists
 }
 function bisectTheta(rc,uT,dphi,br,a,b){
   let Ra=missTheta(rc,uT,dphi,br,a);
-  if(!isFinite(Ra))return -1;
-  for(let i=0;i<42;i++){
+  for(let i=0;i<48;i++){
     const m=(a+b)/2,Rm=missTheta(rc,uT,dphi,br,m);
-    if(!isFinite(Rm)){b=m;continue;}
     if(Math.abs(Rm)<2e-4)return m;
     if(Ra*Rm<=0)b=m;else{a=m;Ra=Rm;}
   }
@@ -696,7 +716,7 @@ function solveImage(p,C,rc){
       rescanBudget--;
       const g=gridTheta(rc,uT,dphi);
       if(g){th=g[0];br=g[1];}
-      else p.cool=15;
+      else p.cool=6;
     }
   }
   if(th<0){p.vis=false;return;}
@@ -793,7 +813,10 @@ function drawDebris(){
     }
     const h0=ob.parts[0];
     if(h0.onscreen&&h0.mode==='fall'){
-      const st=strandStretch(ob);
+      // report the maximum stretch achieved: near the freeze the static-slice length honestly
+      // collapses (the distant view flattens everything), which would run the counter backwards
+      ob.stMax=Math.max(ob.stMax,strandStretch(ob));
+      const st=ob.stMax;
       ovCtx.globalCompositeOperation='source-over';
       ovCtx.font=Math.max(10,Math.round(H/72))+'px system-ui,sans-serif';
       ovCtx.fillStyle='rgba(147,160,184,0.85)';
