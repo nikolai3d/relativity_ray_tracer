@@ -132,7 +132,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
 
   <p class="sect">Spaghettification</p>
   <button id="throwBtn">Throw something in 🥄</button>
-  <p class="hint">A little rigid object on a random plunging orbit — then gravity alone: every fragment rides its own exact timelike geodesic, and the tide tears them apart. ×n is how many times longer it has grown. Near the horizon it freezes and redshifts to black, exactly as a distant camera sees.</p>
+  <p class="hint">A little rigid object on a random plunging orbit — then gravity alone: every fragment rides its own exact timelike geodesic, and the tide tears them apart. ×n is how many times longer it has grown (proper length). Near the horizon it freezes and redshifts to black, exactly as a distant camera sees. Throwing eases the clock to 5 r<sub>s</sub>/c per second so the fall is watchable — the speed slider stays yours.</p>
 
   <p class="sect">Relativity, à la carte</p>
   <div class="presets" id="fxBtns">
@@ -449,7 +449,7 @@ const OBJECTS=[['a teapot 🫖',4800],['a comet ☄️',8500],['an asteroid 🪨
   ['a grand piano 🎹',4400],['a rubber duck 🦆',5200],['a snowman ⛄',7000],
   ['a school bus 🚌',4100],['a very small star ⭐',9500],['your homework 📚',5600],
   ['a wheel of cheese 🧀',4000]];
-const AXN=7,PERPN=4,LEN0=0.62,PERPR=0.13,MAXOBJ=5;
+const AXN=7,PERPN=4,LEN0=1.6,PERPR=0.3,MAXOBJ=5;
 const debris=[];
 const ov=document.getElementById('ov'),ovCtx=ov.getContext('2d');
 let ovLive=false;
@@ -464,7 +464,7 @@ function newParticle(P,V,T){
   const s=Math.sqrt(1-1/r);
   const g=1/Math.sqrt(Math.max(1-vr*vr-vt*vt,1e-4));
   return {e1,e2,r,phi:0,pr:g*s*vr,E:g*s,L:g*vt*r,T,
-          mode:'fall',fade:1,pz:undefined,dimN:0,dist:1,
+          mode:'fall',fade:1,pz:undefined,dimN:0,frzN:0,cool:0,dist:1,
           th:-1,br:0,vis:false,trans:1,dir3:null,n3:null,
           sx:0,sy:0,size:2,B:0,cr:0,cg:0,cb:0,onscreen:false};
 }
@@ -479,7 +479,9 @@ function throwObject(){
   const P0=[sd[0]*r0,sd[1]*r0,sd[2]*r0];
   const v0=0.28+0.24*rng();
   const gm=1/Math.sqrt(1-v0*v0);
-  const Lt=0.25+2.15*rng();               // below ~2: plunge; near the top: near-miss slingshots
+  // mostly steep plunges (small L crosses the disk plane inside the ISCO gap, in full view);
+  // 1 in 5 gets near-critical L for a winding near-miss or slingshot
+  const Lt=rng()<0.8?0.3+1.4*rng():1.85+0.55*rng();
   const sinA=Math.min(0.9,Lt/(gm*v0*r0)), cosA=Math.sqrt(1-sinA*sinA);
   const tv=perpToRnd(sd);
   const V=[v0*(-sd[0]*cosA+tv[0]*sinA),v0*(-sd[1]*cosA+tv[1]*sinA),v0*(-sd[2]*cosA+tv[2]*sinA)];
@@ -495,6 +497,11 @@ function throwObject(){
     parts.push(newParticle([P0[0]+q1[0]*co+q2[0]*si,P0[1]+q1[1]*co+q2[1]*si,P0[2]+q1[2]*co+q2[2]*si],V,kind[1]));
   }
   debris.push({name:kind[0],parts});
+  if(params.speed>5){                     // ease the clock so the fall is watchable; slider stays yours
+    params.speed=5;
+    speedSl.value=Math.round(1000*Math.log10(params.speed/0.5)/3);
+    updateSpeedLabel();
+  }
 }
 function perpToRnd(a){
   const t=[rng()-0.5,rng()-0.5,rng()-0.5];
@@ -558,6 +565,7 @@ function updateDebris(dtSim){
       }
       p.pz=_P[2];
       if(p.r>380)p.mode='gone';
+      if(p.r<=1.02){p.frzN++;if(p.frzN>600)p.mode='gone';}   // frozen at the horizon: retire quietly
     }
   }
   for(const ob of debris)for(const p of ob.parts)if(p.mode==='splat'){p.fade-=0.025;if(p.fade<=0)p.mode='gone';}
@@ -680,10 +688,16 @@ function solveImage(p,C,rc){
   }
   let th=-1,br=p.br;
   if(p.th>0)th=polishTheta(rc,uT,dphi,p.br,p.th);
-  if(th<0&&rescanBudget>0){
-    rescanBudget--;
-    const g=gridTheta(rc,uT,dphi);
-    if(g){th=g[0];br=g[1];}
+  if(th<0){
+    // full rescans are budgeted per frame; occluded fragments sleep between attempts
+    // so they can't starve newly thrown objects of the budget
+    if(p.cool>0){p.cool--;p.vis=false;return;}
+    if(rescanBudget>0){
+      rescanBudget--;
+      const g=gridTheta(rc,uT,dphi);
+      if(g){th=g[0];br=g[1];}
+      else p.cool=15;
+    }
   }
   if(th<0){p.vis=false;return;}
   p.th=th;p.br=br;
@@ -730,7 +744,7 @@ function drawDebris(){
   const {C,F,R,U}=camBasis();
   const rc=Math.hypot(C[0],C[1],C[2]);
   const tanF=Math.tan(params.fov*RAD/2);
-  rescanBudget=6;
+  rescanBudget=10;
   ovCtx.globalCompositeOperation='lighter';
   ovCtx.lineCap='round';
   for(const ob of debris){
@@ -746,7 +760,9 @@ function drawDebris(){
       const sy=H/2-(d[0]*U[0]+d[1]*U[1]+d[2]*U[2])/df*(H*0.5)/tanF;
       if(sx<-40||sx>W+40||sy<-40||sy>H+40)continue;
       const g=gFactor(p,rc);
-      let B=Math.min(24,Math.pow(Math.max(g,0),4))*p.trans;
+      // base luminosity ×3 is ours to pick (the object's intrinsic brightness is arbitrary);
+      // only the relative g⁴ dimming and the disk transmittance are physics
+      let B=Math.min(24,3*Math.pow(Math.max(g,0),4))*p.trans;
       if(p.mode==='splat')B*=p.fade*2.5;
       if(B<2e-3){p.dimN++;if(p.dimN>240&&p.r<1.6)p.mode='gone';continue;}
       p.dimN=0;
@@ -754,7 +770,7 @@ function drawDebris(){
       const m=Math.min(1.5,B);
       p.cr=Math.round(255*tonemap(_bb2[0]*m));p.cg=Math.round(255*tonemap(_bb2[1]*m));p.cb=Math.round(255*tonemap(_bb2[2]*m));
       p.sx=sx;p.sy=sy;p.B=B;
-      p.size=Math.max(1.4,Math.min(12,0.11/Math.max(p.dist,1)*(H*0.5)/tanF));
+      p.size=Math.max(2.2,Math.min(14,0.2/Math.max(p.dist,1)*(H*0.5)/tanF));
       if(p.mode==='splat')p.size*=1+3*(1-p.fade);
       p.onscreen=true;
     }
