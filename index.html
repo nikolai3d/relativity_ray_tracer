@@ -31,15 +31,17 @@ body{margin:0;background:var(--void);color:var(--ink);font-family:var(--sans);ov
 #masthead h1{font-family:var(--serif);font-weight:400;font-size:23px;letter-spacing:.01em;margin:0 0 4px;text-wrap:balance}
 #masthead h1 em{font-style:normal;color:var(--gold)}
 #masthead p{margin:0;font-size:12px;line-height:1.5;color:var(--ink-dim)}
-#masthead .plea{font-family:var(--serif);font-style:italic;color:var(--ink-faint);font-size:11.5px;margin-top:6px}
 
 #timebar{top:14px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;padding:8px 14px;z-index:3}
 #playBtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:rgba(233,238,247,.06);
   color:var(--ink);font-size:14px;cursor:pointer;display:grid;place-items:center}
 #playBtn:hover{background:rgba(233,238,247,.12)}
+#accBtn{height:34px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:rgba(233,238,247,.06);
+  color:var(--ink-dim);font-size:11px;font-family:var(--sans);cursor:pointer;white-space:nowrap}
+#accBtn:hover{color:var(--ink);background:rgba(233,238,247,.12)}
 #timebar input[type=range]{width:130px}
 #speedLabel{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-faint);white-space:nowrap}
-#clock{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-dim);min-width:150px}
+#clock{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:12px;color:var(--ink-dim);min-width:150px;white-space:nowrap}
 #speedVal{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:11px;color:var(--ink-faint);min-width:78px}
 
 #controls{padding:14px 16px;overflow-y:auto;min-height:0;flex:0 1 auto}
@@ -67,7 +69,7 @@ input[type=range]{width:100%;accent-color:var(--gold);height:18px;margin:0}
 .chk input{accent-color:var(--gold);margin:0}
 #advBlock>.sect:first-child{margin-top:16px}
 #controls.simple .adv,#controls.simple #advBlock{display:none}
-#controls:not(.simple) .chk{display:none}
+#controls:not(.simple) .simple-only{display:none}
 #reseed{width:100%;margin-top:10px}
 button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
@@ -96,39 +98,53 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
 #banner{top:66px;left:50%;transform:translateX(-50%);padding:9px 18px;font-size:13px;color:var(--bad);
   border-color:rgba(228,104,94,.5);display:none;text-align:center;z-index:4}
 
-@media (max-width:900px){
-  #leftcol{width:220px;bottom:auto;max-height:52vh}
-  #masthead h1{font-size:16px} #masthead .plea{display:none} #masthead p{font-size:11px}
-  #controls{max-height:24vh}
-  #readouts{width:236px;max-height:44vh}
-  #science{max-width:calc(100vw - 28px);width:calc(100vw - 28px);bottom:64px}
-  #timebar{top:auto;bottom:8px} #clock{min-width:0}
+/* compact mode: phones in either orientation — the picture owns the screen,
+   the tool panel lives behind the ⚙ toggle */
+#uiToggle{position:fixed;top:12px;left:12px;z-index:5;width:40px;height:40px;border-radius:10px;
+  border:1px solid var(--line);background:var(--glass);color:var(--ink);font-size:18px;cursor:pointer;
+  display:none;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#uiToggle.open{color:var(--gold);border-color:rgba(255,217,143,.4)}
+@media (max-width:760px),(max-height:520px){
+  #uiToggle{display:block}
+  #leftcol{display:none;top:60px;left:12px;bottom:auto;max-height:calc(100vh - 84px);width:min(300px,calc(100vw - 24px));z-index:4}
+  #leftcol.open{display:flex}
+  #leftcol.open~#timebar,#leftcol.open~#science{display:none}
+  #masthead{padding:10px 14px 8px}
+  #masthead h1{font-size:15px;margin:0}
+  #masthead p{display:none}
+  #timebar{top:auto;bottom:10px;gap:8px;padding:6px 10px;max-width:calc(100vw - 20px)}
+  #speedLabel,#speedVal,#accBtn span{display:none}
+  #timebar input[type=range]{width:70px}
+  #clock{min-width:0;font-size:10px}
+  #science{bottom:58px;left:12px;right:12px;transform:none;width:auto;max-width:none;min-width:0}
+  #science summary{font-size:12px;padding:8px 12px}
+  #readouts{top:12px;right:12px;width:min(302px,calc(100vw - 76px));max-height:70vh}
 }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
 <canvas id="cpu"></canvas>
+<button id="uiToggle" aria-label="Show or hide controls" aria-expanded="false">⚙</button>
 
 <div id="leftcol">
 <div id="masthead" class="panel">
   <h1>The Photon Ring<br><em>a black hole, honestly traced</em></h1>
   <p>Every pixel is a <b>null geodesic</b>, integrated live through Schwarzschild spacetime — the photon ring, the disk’s far side arching over the top, the wing brightened by Doppler beaming. Nothing is painted on.</p>
-  <p class="plea">“People of science, hear my plea: they showed me a photograph of a glowing ring and called it a black hole. Is it true the far side of the disk arches over the shadow, and one wing burns brighter because the gas rushes toward us? Bend every ray honestly, and show me what the camera saw.”</p>
   <p style="margin-top:6px;color:var(--ink-faint);font-size:11px">drag to orbit · scroll or pinch to zoom</p>
 </div>
 
-<aside id="controls" class="panel">
+<aside id="controls" class="panel simple">
   <div class="seg" id="uiSeg">
-    <button data-u="simple">Simple</button>
-    <button data-u="advanced" class="on">Advanced</button>
+    <button data-u="simple" class="on">Simple</button>
+    <button data-u="advanced">Advanced</button>
   </div>
   <p class="sect">Point of view</p>
   <div class="ctl"><label>Inclination from the pole <b id="incVal"></b></label>
     <input id="inc" type="range" min="5" max="900" value="820"></div>
   <div class="ctl"><label>Camera tilt <b id="tiltVal"></b></label>
     <input id="tilt" type="range" min="-200" max="200" value="0"></div>
-  <label class="chk"><input id="lensChk" type="checkbox" checked> Bend light (general relativity)</label>
+  <label class="chk simple-only"><input id="lensChk" type="checkbox" checked> Bend light (general relativity)</label>
   <div class="ctl adv"><label>Camera distance <b id="distVal"></b></label>
     <input id="dist" type="range" min="0" max="1000" value="581"></div>
   <div class="ctl adv"><label>Field of view <b id="fovVal"></b></label>
@@ -175,12 +191,16 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
   </div>
   <p class="hint">The same rays, two arithmetics. The CPU engine is the double-precision reference — patient, one honest frame at a time.</p>
   <button id="reseed">Re-seed the background sky 🎲</button>
+
+  <p class="sect">Readouts</p>
+  <label class="chk"><input id="physChk" type="checkbox"> See physical parameters</label>
   </div>
 </aside>
 </div>
 
 <div id="timebar" class="panel">
   <button id="playBtn" aria-label="Play or pause">❚❚</button>
+  <button id="accBtn" title="Fresh spiral overdensities in the disk, clock rewound to t = 0">🌀<span> Re-seed accretion</span></button>
   <label id="speedLabel" for="speed">Speed</label>
   <input id="speed" type="range" min="0" max="1000" value="490">
   <span id="speedVal"></span>
@@ -189,7 +209,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
 
 <div id="banner" class="panel"></div>
 
-<aside id="readouts" class="panel">
+<aside id="readouts" class="panel" style="display:none">
   <p class="sect">Honesty checks&thinsp;*</p>
   <div class="row"><span class="k">Photon ring b, measured</span><span class="v" id="rRing">measuring…</span></div>
   <div class="row"><span class="k">…vs theory 3√3⁄2 r<sub>s</sub></span><span class="v"><span id="vRing" class="pill dim">—</span></span></div>
@@ -227,7 +247,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
     <h3>2 · Why the picture looks like that</h3>
     <p>The bright halo hugging the shadow is the <b>photon ring</b>: rays with impact parameter near b = 3√3⁄2&thinsp;r<sub>s</sub> ≈ 2.598&thinsp;r<sub>s</sub> circle the hole one or more times before escaping, so a thin annulus of sky carries an image of the entire disk, repeated. The disk’s far side doesn’t hide behind the hole: rays passing over the pole are bent down onto its top surface, so you see it <b>arched above the shadow</b> (and its underside mirrored below — the Interstellar look). And the two wings are unequal because the gas orbits at nearly half the speed of light at the inner edge: relativistic <b>Doppler beaming</b> brightens the approaching side by roughly g⁴, where g is the frequency shift. Toggle the effects off one at a time and the portrait falls apart into a Newtonian saucer.</p>
     <h3>3 · The disk</h3>
-    <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest. The outer rim fades out gradually and raggedly rather than at a hard circle, and it goes <b>optically thin</b> as it fades — rays keep going through the last wisps, so the lensed sky (and the disk’s own far side) shines through. Real disks end in a taper, not a cliff, though the taper’s exact shape here is aesthetic, not derived.</p>
+    <p>The gas is a thin <b>Shakura–Sunyaev disk</b>: temperature T ∝ r<sup>−3/4</sup>(1−√(r<sub>in</sub>/r))<sup>1/4</sup>, truncated at the innermost stable circular orbit r<sub>in</sub> = 3&thinsp;r<sub>s</sub>, radiating as a blackbody whose color you see. Each disk pixel is shifted by the exact combined factor <b>g = √(1−3M/r) / [(1−Ω&thinsp;L<sub>z</sub>/E)&thinsp;√(1−r<sub>s</sub>/r<sub>cam</sub>)]</b> — orbital time dilation, Doppler from the Keplerian motion (Ω = √(M/r³)), and the climb out of the well — with observed intensity scaled by g⁴ and observed color by the blackbody at g·T. The swirling brightness pattern is decoration (real turbulence isn’t computable in a browser tab), but it is advected at the <b>true Keplerian angular speed at every radius</b>, so the differential shear you watch is honest. The 🌀 button re-seeds that decoration with sparse spiral arms at t = 0 — how they wind tighter and shear away, inner radii first, is the honest differential rotation at work. The outer rim fades out gradually and raggedly rather than at a hard circle, and it goes <b>optically thin</b> as it fades — rays keep going through the last wisps, so the lensed sky (and the disk’s own far side) shines through. Real disks end in a taper, not a cliff, though the taper’s exact shape here is aesthetic, not derived.</p>
     <h3>4 · Honest caveats</h3>
     <p><b>No spin.</b> This is Schwarzschild; real black holes rotate. Kerr spacetime drags frames, shrinks the ISCO (as low as 0.5&thinsp;r<sub>s</sub> of gravitational radius for maximal spin), and makes the shadow slightly D-shaped — percent-level corrections to the ring, big corrections to the inner disk. <b>The disk is opaque and thin</b> (except its tapering rim, which is allowed to go optically thin); M87*’s real glow is synchrotron plasma, not a blackbody, and no polarization is computed here. <b>The camera hovers</b> — a static Schwarzschild observer, engines burning, not a free-falling one. The background sky is procedural, not a star catalog. And a confession from Hollywood: Interstellar’s Gargantua deliberately <i>omitted</i> Doppler beaming and blue/red shifts so the disk would look symmetric and golden on screen — the preset above reproduces that choice; flip “Doppler &amp; beaming” back on to see what Kip Thorne’s honest version looks like.</p>
     <p class="fn"><b>Numerical method:</b> per pixel, the ray’s plane is found from camera position and pixel direction (Schwarzschild orbits are planar), the Binet equation above is advanced by RK4 with dφ = 6π/steps, and disk crossings are detected by sign change of the plane-height and interpolated within the step. Escape is declared when the ray moves outward past r = max(2r<sub>cam</sub>, 400&thinsp;r<sub>s</sub>); its tangent there is the sky direction (the residual bending beyond that radius is ~2Mb/r² ≲ 10⁻⁵ rad). Rays that exhaust the step budget while winding are charged to the shadow — that is what the quality slider trades.</p>
@@ -274,6 +294,18 @@ let seed=20260709;
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 let rng=mulberry32(seed);
 let skySeed=(rng()*4294967296)>>>0;
+
+/* accretion re-seed: sparse log-spiral overdensities in the disk pattern at t = 0,
+   wound up and sheared away by the differential rotation as the clock runs */
+let accSeed=(rng()*4294967296)>>>0;
+const spiral={m:2,q:4,ph:0};
+function spiralFromSeed(){
+  const h=k=>uhash((accSeed^k)>>>0)/4294967296;
+  spiral.m=1+Math.floor(h(0)*3);          // 1–3 arms
+  spiral.q=3+h(0x9e3779b9)*5;             // pitch of the log spiral
+  spiral.ph=h(0x85ebca6b)*TAU;
+}
+spiralFromSeed();
 
 let simT=0, playing=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -420,6 +452,9 @@ function diskCol(Xx,Xy,r,g,t,o,out){
   const px=Math.cos(a2)*r*0.85, py=Math.sin(a2)*r*0.85;
   let pat=0.70+0.62*fbm(px,py,701);
   pat*=0.82+0.36*vnoise(r*3.1,0,809);
+  const sw=om*t;                                  // local winding; arms shear out inside-first
+  const arm=Math.pow(0.5+0.5*Math.cos(spiral.m*a2+spiral.q*Math.log(r)+spiral.ph),6);
+  pat*=1+2.4*arm*(0.35+0.65*vnoise(px*0.7,py*0.7,881^accSeed))*Math.exp(-sw*sw*0.006);
   const Tem=o.tmax*Math.pow(r,-0.75)*Math.pow(Math.max(1-Math.sqrt(RIN/r),1e-4),0.25)/PMAX;
   const gg=Math.max(g,0);
   const I=Math.pow(gg*Tem/o.tmax,4)*pat*0.8;
@@ -498,7 +533,8 @@ uniform vec3 uCam,uRight,uUp,uFwd;
 uniform float uTanF,uDphi,uREsc,uRout,uTmax,uPmax,uTime;
 uniform float uLens,uDopp,uGrav,uDisk;
 uniform int uSteps;
-uniform uint uSeed;
+uniform uint uSeed,uAccSeed;
+uniform vec3 uSpiral;
 const float RIN=3.0;
 uint uhash(uint x){x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;x^=x>>16;return x;}
 float hcell(ivec3 c,uint k){return float(uhash((uint(c.x)*73856093u^uint(c.y)*19349663u^uint(c.z)*83492791u)^k^uSeed))*2.3283064365386963e-10;}
@@ -553,6 +589,9 @@ vec4 diskShade(vec2 X,float r,float g){    // rgb = emission·opacity, a = opaci
   vec2 pp=vec2(cos(a2),sin(a2))*r*0.85;
   float pat=0.70+0.62*fbm(pp,701u);
   pat*=0.82+0.36*vnoise(vec2(r*3.1,0.0),809u);
+  float sw=om*uTime;                              // local winding; arms shear out inside-first
+  float arm=pow(0.5+0.5*cos(uSpiral.x*a2+uSpiral.y*log(r)+uSpiral.z),6.0);
+  pat*=1.0+2.4*arm*(0.35+0.65*vnoise(pp*0.7,881u^uAccSeed))*exp(-sw*sw*0.006);
   float Tem=uTmax*pow(r,-0.75)*pow(max(1.0-sqrt(RIN/r),1e-4),0.25)/uPmax;
   float gg=max(g,0.0);
   float I=pow(gg*Tem/uTmax,4.0)*pat*0.8;
@@ -799,6 +838,16 @@ function syncFx(){
   lensChk.checked=!!params.lens;
 }
 
+const uiToggle=$('uiToggle');
+uiToggle.addEventListener('click',()=>{
+  const open=$('leftcol').classList.toggle('open');
+  uiToggle.classList.toggle('open',open);
+  uiToggle.setAttribute('aria-expanded',open);
+});
+
+const physChk=$('physChk');
+physChk.addEventListener('change',()=>{$('readouts').style.display=physChk.checked?'':'none';});
+
 const uiBtns=[...$('uiSeg').querySelectorAll('button')];
 uiBtns.forEach(b=>b.addEventListener('click',()=>{
   uiBtns.forEach(x=>x.classList.toggle('on',x===b));
@@ -836,6 +885,12 @@ function setMode(m){
 }
 
 $('reseed').addEventListener('click',()=>{skySeed=(rng()*4294967296)>>>0;viewChanged();});
+$('accBtn').addEventListener('click',()=>{
+  accSeed=(rng()*4294967296)>>>0;
+  spiralFromSeed();
+  simT=0;                                   // fresh arms belong at the very beginning
+  viewChanged();
+});
 
 const playBtn=$('playBtn'),speedSl=$('speed');
 playBtn.addEventListener('click',()=>{playing=!playing;playBtn.textContent=playing?'❚❚':'▶';});
@@ -904,6 +959,8 @@ function renderGL(){
   gl.uniform1f(uT.uDisk,params.disk);
   gl.uniform1i(uT.uSteps,params.steps);
   gl.uniform1ui(uT.uSeed,skySeed);
+  gl.uniform1ui(uT.uAccSeed,accSeed);
+  gl.uniform3f(uT.uSpiral,spiral.m,spiral.q,spiral.ph);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
 
