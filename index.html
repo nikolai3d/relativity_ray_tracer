@@ -61,6 +61,13 @@ input[type=range]{width:100%;accent-color:var(--gold);height:18px;margin:0}
 .seg button{border:0;border-radius:0;flex:1}
 .seg button.on{background:rgba(255,217,143,.16);color:var(--gold)}
 .seg button:disabled{opacity:.35;cursor:not-allowed}
+#uiSeg{margin-bottom:14px}
+#uiSeg+.sect{margin-top:0}
+.chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-dim);margin-bottom:12px;cursor:pointer}
+.chk input{accent-color:var(--gold);margin:0}
+#advBlock>.sect:first-child{margin-top:16px}
+#controls.simple .adv,#controls.simple #advBlock{display:none}
+#controls:not(.simple) .chk{display:none}
 #reseed{width:100%;margin-top:10px}
 button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
@@ -112,14 +119,22 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
 </div>
 
 <aside id="controls" class="panel">
+  <div class="seg" id="uiSeg">
+    <button data-u="simple">Simple</button>
+    <button data-u="advanced" class="on">Advanced</button>
+  </div>
   <p class="sect">Point of view</p>
   <div class="ctl"><label>Inclination from the pole <b id="incVal"></b></label>
     <input id="inc" type="range" min="5" max="900" value="820"></div>
-  <div class="ctl"><label>Camera distance <b id="distVal"></b></label>
+  <div class="ctl"><label>Camera tilt <b id="tiltVal"></b></label>
+    <input id="tilt" type="range" min="-200" max="200" value="0"></div>
+  <label class="chk"><input id="lensChk" type="checkbox" checked> Bend light (general relativity)</label>
+  <div class="ctl adv"><label>Camera distance <b id="distVal"></b></label>
     <input id="dist" type="range" min="0" max="1000" value="581"></div>
-  <div class="ctl"><label>Field of view <b id="fovVal"></b></label>
+  <div class="ctl adv"><label>Field of view <b id="fovVal"></b></label>
     <input id="fov" type="range" min="25" max="100" value="55"></div>
 
+  <div id="advBlock">
   <p class="sect">The accretion disk</p>
   <div class="ctl"><label>Outer radius <b id="routVal"></b></label>
     <input id="rout" type="range" min="40" max="300" value="140">
@@ -160,6 +175,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible{outline:2px sol
   </div>
   <p class="hint">The same rays, two arithmetics. The CPU engine is the double-precision reference — patient, one honest frame at a time.</p>
   <button id="reseed">Re-seed the background sky 🎲</button>
+  </div>
 </aside>
 </div>
 
@@ -239,7 +255,7 @@ const KPC_KM=3.0857e16;
 
 /* ===================== parameters ===================== */
 const mobile=innerWidth<700;
-const params={ inc:82, dist:27, fov:55, rout:14, tmax:7000,
+const params={ inc:82, tilt:0, dist:27, fov:55, rout:14, tmax:7000,
   disk:1, lens:1, dopp:1, grav:1,
   steps:mobile?500:900, res:mobile?0.5:1, mode:'gpu', mass:1, speed:15 };
 const PRESETS={
@@ -643,7 +659,14 @@ function camBasis(){
   let R=cross3(F,[0,0,1]);
   const l=Math.hypot(R[0],R[1],R[2]);
   R=l<1e-6?[1,0,0]:[R[0]/l,R[1]/l,R[2]/l];
-  const U=cross3(R,F);
+  let U=cross3(R,F);
+  const t=params.tilt*RAD;                    // roll about the view axis, applied last
+  if(t){
+    const ct=Math.cos(t),st=Math.sin(t);
+    const R2=[R[0]*ct+U[0]*st,R[1]*ct+U[1]*st,R[2]*ct+U[2]*st];
+    U=[U[0]*ct-R[0]*st,U[1]*ct-R[1]*st,U[2]*ct-R[2]*st];
+    R=R2;
+  }
   return {C,F,R,U};
 }
 function attachNav(el){
@@ -738,6 +761,7 @@ function showBanner(msg){el.banner.textContent=msg;el.banner.style.display='bloc
 
 const sliders={
   inc:{el:$('inc'),val:$('incVal'),to:v=>v/10,from:v=>v*10,fmt:v=>v.toFixed(1)+'°'},
+  tilt:{el:$('tilt'),val:$('tiltVal'),to:v=>v/10,from:v=>v*10,fmt:v=>v.toFixed(1)+'°'},
   dist:{el:$('dist'),val:$('distVal'),to:v=>2.5*Math.pow(60,v/1000),from:v=>1000*Math.log(v/2.5)/Math.log(60),fmt:v=>v.toFixed(1)+' rs'},
   fov:{el:$('fov'),val:$('fovVal'),to:v=>v,from:v=>v,fmt:v=>v.toFixed(0)+'°'},
   rout:{el:$('rout'),val:$('routVal'),to:v=>v/10,from:v=>v*10,fmt:v=>v.toFixed(1)+' rs'},
@@ -762,16 +786,31 @@ const fxBtns=[...$('fxBtns').querySelectorAll('button')];
 fxBtns.forEach(b=>b.addEventListener('click',()=>{
   const f=b.dataset.f;
   params[f]=params[f]?0:1;
-  b.classList.toggle('on',!!params[f]);
+  syncFx();
   clearPreset(); viewChanged();
 }));
-function syncFx(){fxBtns.forEach(b=>b.classList.toggle('on',!!params[b.dataset.f]));}
+const lensChk=$('lensChk');
+lensChk.addEventListener('change',()=>{
+  params.lens=lensChk.checked?1:0;
+  syncFx(); clearPreset(); viewChanged();
+});
+function syncFx(){
+  fxBtns.forEach(b=>b.classList.toggle('on',!!params[b.dataset.f]));
+  lensChk.checked=!!params.lens;
+}
+
+const uiBtns=[...$('uiSeg').querySelectorAll('button')];
+uiBtns.forEach(b=>b.addEventListener('click',()=>{
+  uiBtns.forEach(x=>x.classList.toggle('on',x===b));
+  $('controls').classList.toggle('simple',b.dataset.u==='simple');
+}));
 
 const presetBtns=[...$('presetBtns').querySelectorAll('button')];
 presetBtns.forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.p)));
 function applyPreset(p){
   const P=PRESETS[p];
   for(const k of ['inc','dist','fov','rout','tmax','disk','lens','dopp','grav','mass'])params[k]=P[k];
+  params.tilt=P.tilt??0;
   presetBtns.forEach(b=>b.classList.toggle('on',b.dataset.p===p));
   el.presetHint.textContent=P.hint;
   syncSliders();syncFx();syncMass();updateRuler();
